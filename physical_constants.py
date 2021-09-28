@@ -1,10 +1,12 @@
-
+import numpy as np
 
 
 SECONDS_IN_YEAR = 60 * 60 * 24 * 365
 
 # PHYSICAL CONSTANTS
 g = GRAVITATIONAL_ACCELERATION = 9.8
+pi = np.pi
+
 IDEAL_GAS_CONSTANT = 8.314
 POISSONS_RATIO = 0.3
 FRACTURE_TOUGHNESS = 0.1
@@ -37,9 +39,8 @@ units = {
     'melting point at 1 atm': 'K',
     'fracture toughness': 'MPa m^-1/2',
     'driving stress': 'kPa'
-    
+
 }
 
 # Flow law parameter A(T)
 # Huybrechet's paramaterization
-
