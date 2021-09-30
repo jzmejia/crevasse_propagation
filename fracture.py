@@ -1,5 +1,6 @@
-from .physical_constants import DENSITY_ICE, DENSITY_WATER, POISSONS_RATIO, g, pi
+from .physical_constants import DENSITY_ICE, DENSITY_WATER, FRACTURE_TOUGHNESS, POISSONS_RATIO, g, pi
 import numpy as np
+from numpy import sqrt
 from numpy.polynomial import Polynomial as P
 import math as math
 
@@ -8,6 +9,33 @@ import math as math
 # For a fracture to propagate KI (the stress intensity factor)
 # which describes the stresses at the fracture's tip must reach
 # the material's fracture toughness (KIC)
+
+
+def F(crevasse_depth, ice_thickness):
+    """Finite ice thickness correction for the stress intensity factor
+
+    from van der Veen (1998) equation 6
+    F(lambda) where lambda = crevasse depth / ice thickness
+
+    correction accounts for the ~12% increase in the stress intensity
+    factor that accounts for material properties such aas the crack
+    tip plastic zone (i.e., area where plastic deformation occurs ahead
+    of the crack's tip.).
+
+    NOTE: correction is only used for the tensile stress component of 
+    K_I (mode 1)
+
+    Args:
+        crevasse_depth : depth below surface in meters
+        ice_thickness : in meters
+
+    Returns:
+        F(lambda) float : stress intensity correction factor
+
+
+    """
+    p = P([1.12, -0.23, 10.55, -21.72, 30.39])
+    return p(crevasse_depth / ice_thickness)
 
 
 def tensile_stress(Rxx, crevasse_depth, ice_thickness):
@@ -36,16 +64,16 @@ def tensile_stress(Rxx, crevasse_depth, ice_thickness):
     Returns:
         stress intensity factor's tensile component
     """
-    p = P([1.12, -0.23, 10.55, -21.72, 30.39])
-    return p(crevasse_depth/ice_thickness)*Rxx*np.sqrt(pi*crevasse_depth)
+    return F(crevasse_depth, ice_thickness) * Rxx * sqrt(pi * crevasse_depth)
 
 
-def water_hight(Rxx,
-                fracture_toughness: float,
-                crevasse_depth: float,
-                ice_thickness: float,
-                ice_density=DENSITY_ICE
-                ):
+def water_hight(
+    Rxx,
+    fracture_toughness: float,
+    crevasse_depth: float,
+    ice_thickness: float,
+    ice_density=DENSITY_ICE,
+):
     """calc water high in crevasse using van der Veen 2007
 
     van der Veen 1998/2007 equation to estimate the net stress intensity
@@ -88,84 +116,53 @@ def water_hight(Rxx,
             crevasse (=0) or a copletely full crevasse (=crevase_depth).
 
     """
-    return ((fracture_toughness
+    return (
+        (
+            fracture_toughness
             - tensile_stress(Rxx, crevasse_depth, ice_thickness)
-            + 0.683 * ice_density * g * crevasse_depth**1.5)
-            / (0.683 * DENSITY_WATER * g))**(2/3)
+            + 0.683 * ice_density * g * sqrt(pi) * crevasse_depth ** 1.5
+        )
+        / (0.683 * DENSITY_WATER * g * sqrt(pi))
+    ) ** (2 / 3)
 
 
-def water_height_to_depth(water_height, crevasse_depth):
-    """convert water level above crack tip to depth below ice surface
-
-    Args:
-        water_height ([float]): water height above crack tip (m)
-        crevasse_depth ([float]): crack tip depth below surface (m)
-
-    Returns:
-        water depth: water level depth below ice surface (m)
-    """
-    return crevasse_depth - water_height
+def water_depth(Rxx,
+                crevasse_depth,
+                ice_thickness,
+                fracture_toughness=FRACTURE_TOUGHNESS,
+                ice_density=DENSITY_ICE
+                ):
+    return crevasse_depth - water_height(Rxx, fracture_toughness,
+                                         crevasse_depth, ice_thickness, ice_density)
 
 
-def crevasse_volume():
+def sigma_A(has_water=False):
     pass
 
 
-def B():
-    pass
+def integrate_b11(x, x_, c):
+    """solve integral of the form b11 from Weertman 1996
 
-
-def wall_displacement(y,
-                      longitudinal_stress,
-                      crevasse_depth,
-                      water_depth,
-                      shear_modulus,
-                      ):
-
-    # c = 2*alpha/mu = 2*(1-poisson's ratio)/shear_modulus = 1.4/shear_mod
-    c = (2 * (1 - POISSONS_RATIO)) / (shear_modulus*pi)
-    # for conciseness
-    z = crevasse_depth
-    d = water_depth
-    term1 = sigma(longitudinal_stress, z, d) * rds(z, y) * pi
-    D = c * (term1
-             + DENSITY_ICE*g*z * rds(z, y)
-             - DENSITY_WATER*g * rds(z, d) * rds(z, y)
-             - 0.5*DENSITY_ICE*g*y**2 * np.log((z+rds(z, y))/(z-rds(z, y)))
-             + 0.5*DENSITY_WATER*g*(y**2-d**2)*np.log(math.abs((rds(z, d)+rds(z, y))
-                                                               / (rds(z, d)-rds(z, y))))
-             - DENSITY_WATER*g*d*y * np.log(abs((d*rds(z, y)+y*rds(z, d))
-                                                / (d*rds(z, y)-y*rds(z, d))))
-             + DENSITY_WATER*g*d**2 * np.log(abs((rds(z, y)+rds(z, d))
-                                                 / (rds(z, y)-rds(z, d))))
-             )
-    return D
-
-
-def sigma(longitudinal_stress,
-          crevasse_depth,
-          water_depth,
-          ):
-    return (longitudinal_stress
-            - (2*DENSITY_ICE*g*crevasse_depth) / pi
-            - DENSITY_WATER*g*water_depth
-            + (2/pi)*DENSITY_WATER*g*water_depth *
-            math.asin(water_depth/crevasse_depth)
-            + ((2*DENSITY_WATER*g)/pi) *
-            math.sqrt(crevasse_depth**2-water_depth**2)
-            )
-
-
-def rds(x, y):
-    """return the square root of the difference of squares
-
-    sqrt(x**2 - y**2)
+    I1  = integral of x'dx'/(x^2-x'^2)sqrt(c^2-x'^2)
+        = 1 / 2*sqrt(c^2-x^2) ln|a+b/b-a| for x^2<c^2 
+            where a = sqrt(c^2-x^2) and b is sqrt(c^2-x'2)
 
     Args:
         x ([type]): [description]
-        y ([type]): [description]
-
-    Returns:
-        [type]: [description]
+        x2 ([type]): [description]
+        c ([type]): [description]
     """
-    return math.sqrt(x**2-y**2)
+
+
+def sigma(
+    sigma_T, crevasse_depth, water_depth,
+):
+    return (
+        sigma_T
+        - (2 * DENSITY_ICE * g * crevasse_depth) / pi
+        - DENSITY_WATER * g * water_depth
+        + (2/pi)*DENSITY_WATER * g * water_depth * math.asin(
+            water_depth/crevasse_depth)
+        + ((2*DENSITY_WATER*g) / pi) * math.sqrt(
+            crevasse_depth ** 2 - water_depth ** 2)
+    )

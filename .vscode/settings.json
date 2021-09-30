@@ -1,8 +1,14 @@
 {
     "editor.rulers": [
-        { "column": 80, "color": "#ff00ff" },
-        { "column": 72, "color": "#ff0000" }
-      ],
+        {
+            "column": 80,
+            "color": "#ff00ff"
+        },
+        {
+            "column": 72,
+            "color": "#ff0000"
+        }
+    ],
     "editor.formatOnType": true,
     "editor.formatOnPaste": true,
     "editor.formatOnSave": true,
@@ -12,12 +18,16 @@
     "python.linting.mypyEnabled": true,
     "python.linting.enabled": true,
     "git.ignoreLimitWarning": true,
-
-    "colorInfo.fields" : [
-        "hex", "rgb", "cmyk", "hsl", "css-color-name", "hsv", 
-        "preview"],
-    
-        "colorInfo.languages": [
+    "colorInfo.fields": [
+        "hex",
+        "rgb",
+        "cmyk",
+        "hsl",
+        "css-color-name",
+        "hsv",
+        "preview"
+    ],
+    "colorInfo.languages": [
         {
             "selector": "css",
             "colors": "css"
@@ -40,7 +50,12 @@
         },
         {
             "selector": "python",
-            "colors": ["css", "hex", "rgb", "css-color-names"]
+            "colors": [
+                "css",
+                "hex",
+                "rgb",
+                "css-color-names"
+            ]
         },
         {
             "selector": "markdown",
