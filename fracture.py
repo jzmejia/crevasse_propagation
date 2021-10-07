@@ -1,3 +1,30 @@
+"""
+fracture.py
+
+
+
+
+Geometry
+
+------                ------               ⎤
+    |  \              /                    ⎟
+    |   \<-- D(y) -->/                     ⎟ 
+    |    \          /                      ⎟ 
+    |     \--------/  <--- water's surface ⎦
+    |      \      /
+    |       \    /
+    |        \  /
+    |         \/
+    |
+----|-----------------------> x
+    |
+    V
+    y
+"""
+
+
+
+
 from .physical_constants import DENSITY_ICE, DENSITY_WATER, FRACTURE_TOUGHNESS, POISSONS_RATIO, g, pi
 import numpy as np
 from numpy import sqrt
@@ -11,7 +38,7 @@ import math as math
 # the material's fracture toughness (KIC)
 
 
-def F(crevasse_depth, ice_thickness):
+def F(crevasse_depth, ice_thickness, use_approximation=False):
     """Finite ice thickness correction for the stress intensity factor
 
     from van der Veen (1998) equation 6
@@ -28,6 +55,8 @@ def F(crevasse_depth, ice_thickness):
     Args:
         crevasse_depth : depth below surface in meters
         ice_thickness : in meters
+        use_approximation (bool): defaults to False
+            if True return 1.12 instead of the polynomial expansion
 
     Returns:
         F(lambda) float : stress intensity correction factor
@@ -35,7 +64,7 @@ def F(crevasse_depth, ice_thickness):
 
     """
     p = P([1.12, -0.23, 10.55, -21.72, 30.39])
-    return p(crevasse_depth / ice_thickness)
+    return 1.12 if use_approximation else p(crevasse_depth / ice_thickness)
 
 
 def tensile_stress(Rxx, crevasse_depth, ice_thickness):
@@ -194,3 +223,36 @@ def sigma(
         + ((2*DENSITY_WATER*g) / pi) * math.sqrt(
             crevasse_depth ** 2 - water_depth ** 2)
     )
+
+
+
+    """
+    Displacement D(y) 
+
+    """
+
+
+
+
+
+
+def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
+    """empirical density-depth relationship from Paterson 1994
+
+    Args:
+        depth (float/array): depth 
+        C (float, optional): constant variable with site
+            0.0165 m^-1 < C < 0.0314 m^-1
+            defaults to 0.02 m^-1
+        ice_density (float, optional): [description]. Defaults to 917.
+        snow_density (float, optional): [description]. Defaults to 350.
+
+    Returns:
+        snow density at depth
+    """
+    return ice_density - (ice_density - snow_density) * np.exp(-C*depth)
+
+
+
+def overburden():
+    return 
