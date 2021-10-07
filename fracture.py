@@ -23,8 +23,6 @@ Geometry
 """
 
 
-
-
 from .physical_constants import DENSITY_ICE, DENSITY_WATER, FRACTURE_TOUGHNESS, POISSONS_RATIO, g, pi
 import numpy as np
 from numpy import sqrt
@@ -225,17 +223,6 @@ def sigma(
     )
 
 
-
-    """
-    Displacement D(y) 
-
-    """
-
-
-
-
-
-
 def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
     """empirical density-depth relationship from Paterson 1994
 
@@ -253,6 +240,5 @@ def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
     return ice_density - (ice_density - snow_density) * np.exp(-C*depth)
 
 
-
 def overburden():
-    return 
+    return
