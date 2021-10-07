@@ -67,7 +67,7 @@ def tensile_stress(Rxx, crevasse_depth, ice_thickness):
     return F(crevasse_depth, ice_thickness) * Rxx * sqrt(pi * crevasse_depth)
 
 
-def water_hight(
+def water_height(
     Rxx,
     fracture_toughness: float,
     crevasse_depth: float,
@@ -138,6 +138,34 @@ def water_depth(Rxx,
 
 def sigma_A(has_water=False):
     pass
+
+
+def D(y,
+      ice_density,
+      sigma_T,
+      mu,
+      crevasse_depth,
+      water_surface,
+      alpha,
+      has_water=True
+      ):
+    # define D and alpha for a water-free crevasse
+    sigma_A = sigma_T - (2 * ice_density*g*crevasse_depth)/pi
+    D = ((2*alpha*sigma_A)/mu * sqrt(crevasse_depth**2-y**2)
+         + ((2*alpha*ice_density*g)/(pi*mu) *
+         crevasse_depth*sqrt(crevasse_depth**2-y**2))
+         - ((2*alpha*ice_density*g*y**2)/(2*pi*G)*np.log(
+             (crevasse_depth+sqrt(crevasse_depth**2-y**2))
+             / (crevasse_depth+sqrt(crevasse_depth**2-y**2))))
+         )
+    if has_water:
+        sigma_A = (sigma_A - DENSITY_WATER*g*water_surface
+                   + (2/pi)*DENSITY_WATER*g*water_surface *
+                   np.arcsin(water_surface/crevasse_depth)
+                   + (2*DENSITY_WATER*g*(crevasse_depth**2-water_surface**2)**0.5)/pi
+                   )
+
+    return
 
 
 def integrate_b11(x, x_, c):
