@@ -36,18 +36,21 @@ This model is currently under construction and is not ready for public use.  We 
 
 ### Notation used in the literature
 
-| parameter                     |    1964    |       1983        |    1996     | van der veen  | value        |
-| ----------------------------- | :--------: | :---------------: | :---------: | :-----------: | ------------ |
-| crevasse depth                |            |         L         |      L      |               |              |
-| depth to water surface        |            |                   |    $y_o$    |               |              |
-| **stress**                    |            |                   |             |               |              |
-| average tensile stress        |            |         T         | $\sigma _A$ |   $R_{xx}$    |              |
-| tensile or compressive stress | $\tau (x)$ | $\sigma _{xx}(y)$ | $\sigma _T$ | $\sigma_{xx}$ |
-| compressive hydrostatic       |            |                   | $\sigma_C$  |      $L$      | $\rho_i g y$ |
-| shear modulus                 |            |       $\mu$       |      G      |               |
-| constant                      |  $\alpha$  |                   | $\alpha _i$ |               |              |
-| stress intensity factor       |            |                   |     $K$     |               |              |
-| K at crack tip                |            |                   |    $K_I$    |               |              |
-| critical K for ice            |            |                   |  $K_{gc}$   |               |              |
-| net Burgers vector            |            |                   |    $b_T$    |               |
-| crevasse opening displacement |            |                   |   $D(y)$    |               |
+| parameter                     |    1964    |       1983        |    1996     | van der veen  | matlab |
+| ----------------------------- | :--------: | :---------------: | :---------: | :-----------: | ------ |
+| ice thickness                 |            |                   |             |       H       |        |
+| variable depth                |            |                   |      y      |       b       | Z      |
+| crevasse depth                |            |         L         |      L      |       d       |        |
+| depth to water surface        |            |                   |   -$y_o$    |       a       | dw     |
+| height of water column        |            |                   |             |      d-a      | b      |
+| **stress**                    |            |                   |             |               |        |
+| average tensile stress        |            |         T         | $\sigma _A$ |   $R_{xx}$    |        |
+| tensile or compressive stress | $\tau (x)$ | $\sigma _{xx}(y)$ | $\sigma _T$ | $\sigma_{xx}$ |        |
+| compressive hydrostatic       |            |                   | $\sigma_C$  |      $L$      |        |
+| shear modulus                 |            |       $\mu$       |      G      |               |        |
+| constant                      |  $\alpha$  |                   | $\alpha _i$ |               |        |
+| stress intensity factor       |            |                   |     $K$     |               |        |
+| K at crack tip                |            |                   |    $K_I$    |               |        |
+| critical K for ice            |            |                   |  $K_{gc}$   |               | KIC    |
+| net Burgers vector            |            |                   |    $b_T$    |               |        |
+| crevasse opening displacement |            |                   |   $D(y)$    |               |        |
