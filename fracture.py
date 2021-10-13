@@ -8,8 +8,8 @@ Geometry
 
 ------                ------               ⎤
     |  \              /                    ⎟
-    |   \<-- D(y) -->/                     ⎟ 
-    |    \          /                      ⎟ 
+    |   \<-- D(y) -->/                     ⎟
+    |    \          /                      ⎟
     |     \--------/  <--- water's surface ⎦
     |      \      /
     |       \    /
@@ -23,6 +23,7 @@ Geometry
 """
 
 
+from numpy.lib.function_base import diff
 from .physical_constants import DENSITY_ICE, DENSITY_WATER, FRACTURE_TOUGHNESS, POISSONS_RATIO, g, pi
 import numpy as np
 from numpy import sqrt
@@ -47,7 +48,7 @@ def F(crevasse_depth, ice_thickness, use_approximation=False):
     tip plastic zone (i.e., area where plastic deformation occurs ahead
     of the crack's tip.).
 
-    NOTE: correction is only used for the tensile stress component of 
+    NOTE: correction is only used for the tensile stress component of
     K_I (mode 1)
 
     Args:
@@ -167,48 +168,6 @@ def sigma_A(has_water=False):
     pass
 
 
-def D(y,
-      ice_density,
-      sigma_T,
-      mu,
-      crevasse_depth,
-      water_surface,
-      alpha,
-      has_water=True
-      ):
-    # define D and alpha for a water-free crevasse
-    sigma_A = sigma_T - (2 * ice_density*g*crevasse_depth)/pi
-    D = ((2*alpha*sigma_A)/mu * sqrt(crevasse_depth**2-y**2)
-         + ((2*alpha*ice_density*g)/(pi*mu) *
-         crevasse_depth*sqrt(crevasse_depth**2-y**2))
-         - ((2*alpha*ice_density*g*y**2)/(2*pi*G)*np.log(
-             (crevasse_depth+sqrt(crevasse_depth**2-y**2))
-             / (crevasse_depth+sqrt(crevasse_depth**2-y**2))))
-         )
-    if has_water:
-        sigma_A = (sigma_A - DENSITY_WATER*g*water_surface
-                   + (2/pi)*DENSITY_WATER*g*water_surface *
-                   np.arcsin(water_surface/crevasse_depth)
-                   + (2*DENSITY_WATER*g*(crevasse_depth**2-water_surface**2)**0.5)/pi
-                   )
-
-    return
-
-
-def integrate_b11(x, x_, c):
-    """solve integral of the form b11 from Weertman 1996
-
-    I1  = integral of x'dx'/(x^2-x'^2)sqrt(c^2-x'^2)
-        = 1 / 2*sqrt(c^2-x^2) ln|a+b/b-a| for x^2<c^2 
-            where a = sqrt(c^2-x^2) and b is sqrt(c^2-x'2)
-
-    Args:
-        x ([type]): [description]
-        x2 ([type]): [description]
-        c ([type]): [description]
-    """
-
-
 def sigma(
     sigma_T, crevasse_depth, water_depth,
 ):
@@ -223,11 +182,66 @@ def sigma(
     )
 
 
+def applied_stress(traction_stress, crevasse_depth, water_depth, has_water=False):
+    sigma_A = traction_stress - (2*DENSITY_ICE*g*crevasse_depth)/pi
+    if has_water:
+        sigma_A = (sigma_A
+                   - DENSITY_WATER*g*water_depth
+                   + (2/pi) * DENSITY_WATER * g * water_depth *
+                   np.arcsin(water_depth/crevasse_depth)
+                   + (2 * DENSITY_WATER * g * (
+                       crevasse_depth**2 - water_depth**2)**(.5)) / pi
+                   )
+    return sigma_A
+
+
+def elastic_displacement(z,
+                         sigma_T,
+                         mu,
+                         crevasse_depth,
+                         water_depth,
+                         alpha,
+                         has_water=True
+                         ):
+    # define D and alpha for a water-free crevasse
+    sigma_A = applied_stress(sigma_T, crevasse_depth,
+                             water_depth, has_water=has_water)
+    # define constant to advoid repeated terms in D equation
+    c1 = (2*alpha)/(mu*pi)
+    D = (c1*pi*sigma_A * diff_squares(crevasse_depth, z)
+         + c1*DENSITY_ICE*g*crevasse_depth*diff_squares(crevasse_depth, z)
+         - c1*DENSITY_ICE*g*z**2*0.5 *
+         np.log(sum_over_diff(crevasse_depth, diff_squares(crevasse_depth, z)))
+         )
+    if has_water:
+        c1 = c1*DENSITY_WATER*g
+        D = (D - c1*diff_squares(crevasse_depth,
+             water_depth)*diff_squares(crevasse_depth, z)
+             + (c1*(z**2-water_depth**2)*0.5*np.log(sum_over_diff(
+                 diff_squares(crevasse_depth, water_depth), diff_squares(crevasse_depth, z))))
+             - c1*water_depth*z*np.log(sum_over_diff(water_depth*diff_squares(
+                 crevasse_depth, z), z*diff_squares(crevasse_depth, water_depth)))
+             + c1*water_depth**2 *
+             np.log(sum_over_diff(diff_squares(crevasse_depth, z)),
+                    diff_squares(crevasse_depth, water_depth))
+             )
+    return D
+
+
+# math helper functions to simplify the
+def sum_over_diff(x, y):
+    return (x+y) / (x-y)
+
+
+def diff_squares(x, y):
+    return np.sqrt(x**2 - y**2)
+
+
 def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
     """empirical density-depth relationship from Paterson 1994
 
     Args:
-        depth (float/array): depth 
+        depth (float/array): depth
         C (float, optional): constant variable with site
             0.0165 m^-1 < C < 0.0314 m^-1
             defaults to 0.02 m^-1
@@ -238,7 +252,3 @@ def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
         snow density at depth
     """
     return ice_density - (ice_density - snow_density) * np.exp(-C*depth)
-
-
-def overburden():
-    return
