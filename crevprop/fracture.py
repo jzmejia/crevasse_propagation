@@ -195,6 +195,15 @@ def applied_stress(traction_stress, crevasse_depth, water_depth, has_water=False
     return sigma_A
 
 
+def alpha(dislocation_type="edge", crack_opening_mode=None):
+    if dislocation_type == "screw" or crack_opening_mode in [3, 'iii', 'III']:
+        alpha = 1
+    elif dislocation_type == "edge" or crack_opening_mode in [1, 2, 'I', 'II']:
+        alpha = 1 - POISSONS_RATIO
+    else:
+        print(f'')
+
+
 def elastic_displacement(z,
                          sigma_T,
                          mu,
