@@ -4,29 +4,31 @@ fracture.py
 
 
 
-Geometry
+Model Geometry
 
-------                ------               ⎤
-    |  \              /                    ⎟
-    |   \<-- D(y) -->/                     ⎟
-    |    \          /                      ⎟
-    |     \--------/  <--- water's surface ⎦
-    |      \      /
-    |       \    /
-    |        \  /
-    |         \/
-    |
-----|-----------------------> x
-    |
-    V
-    y
+  → x
+  ↓ 
+  z                
+                 
+‾‾‾‾⎡‾‾‾‾\                /‾‾‾‾‾‾‾‾‾         ⎤
+    ⎜     \              /                   ⎟
+    ⎜      \<-- D(z) -->/                    ⎟
+    ⎜       \          /                     ⎟
+    d        \--------/  <--- water surface  ⎦
+    ⎜         \      /
+    ⎜          \    /
+    ⎜           \  /
+    ⎣  crevasse  \/
+        depth
+
+
 """
 
 
 from numpy.lib.function_base import diff
 from .physical_constants import DENSITY_ICE, DENSITY_WATER, FRACTURE_TOUGHNESS, POISSONS_RATIO, g, pi
 import numpy as np
-from numpy import sqrt
+from numpy import sqrt, abs
 from numpy.polynomial import Polynomial as P
 import math as math
 
@@ -164,8 +166,6 @@ def water_depth(Rxx,
                                          crevasse_depth, ice_thickness, ice_density)
 
 
-def sigma_A(has_water=False):
-    pass
 
 
 def sigma(
@@ -201,15 +201,16 @@ def alpha(dislocation_type="edge", crack_opening_mode=None):
     elif dislocation_type == "edge" or crack_opening_mode in [1, 2, 'I', 'II']:
         alpha = 1 - POISSONS_RATIO
     else:
-        print(f'')
-
+        print(f'incorrect inputs to function, assuming an edge dislocation alpha=1-v')
+        alpha = 1 - POISSONS_RATIO
+    return alpha
 
 def elastic_displacement(z,
                          sigma_T,
                          mu,
                          crevasse_depth,
                          water_depth,
-                         alpha,
+                         alpha=(1-POISSONS_RATIO),
                          has_water=True
                          ):
     # define D and alpha for a water-free crevasse
@@ -226,15 +227,15 @@ def elastic_displacement(z,
         c1 = c1*DENSITY_WATER*g
         D = (D - c1*diff_squares(crevasse_depth,
              water_depth)*diff_squares(crevasse_depth, z)
-             + (c1*(z**2-water_depth**2)*0.5*np.log(sum_over_diff(
-                 diff_squares(crevasse_depth, water_depth), diff_squares(crevasse_depth, z))))
-             - c1*water_depth*z*np.log(sum_over_diff(water_depth*diff_squares(
-                 crevasse_depth, z), z*diff_squares(crevasse_depth, water_depth)))
+             + (c1*(z**2-water_depth**2)*0.5*np.log(abs(sum_over_diff(
+                 diff_squares(crevasse_depth, water_depth), diff_squares(crevasse_depth, z)))))
+             - c1*water_depth*z*np.log(abs(sum_over_diff(water_depth*diff_squares(
+                 crevasse_depth, z), z*diff_squares(crevasse_depth, water_depth))))
              + c1*water_depth**2 *
-             np.log(sum_over_diff(diff_squares(crevasse_depth, z)),
-                    diff_squares(crevasse_depth, water_depth))
+             np.log(abs(sum_over_diff(diff_squares(crevasse_depth,z),
+                    diff_squares(crevasse_depth, water_depth))))
              )
-    return D
+    return abs(D)
 
 
 # math helper functions to simplify the
