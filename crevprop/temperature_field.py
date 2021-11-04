@@ -42,3 +42,49 @@ Components
 
 
 """
+
+
+def thermal_conductivity(density):
+    """
+    depth dependant thermal conductivity formula, Van Dusen 1929
+
+    note, this gives a lower limit in most cases
+
+    Args:
+        density (float): ice/snow density in kg/m^3
+    """
+    return 2.1e-2 + 4.2e-4 * density + 2.2e-9 * density**3
+
+
+def specific_heat_capacity(temperature):
+    """specific heat capacity for pure ice of temperature in Kelvin
+
+    Specific heat capacity, c, per unit mass of ice in SI units. 
+    Note: c of dry snow and ice does not vary with density because the 
+    heat needed to warm the air and vapor between grains is neglibible.
+    (see Cuffey, ch 9, pp 400)
+
+    c = 152.5 + 7.122(T)
+
+    Args:
+        temperature (float): ice temperature in degrees Kelvin
+
+    Returns:
+        float : specific heat capacity (c) in Jkg^-1K^-1
+    """
+
+    return 152.5 + 7.122 * temperature
+
+
+def thermal_diffusivity(thermal_conductivity, density, specific_heat_capacity):
+    """
+
+    Args:
+        thermal_conductivity (float): W/mK
+        density (float): kg/m^3
+        specific_heat_capacity (float): J/kgK
+
+    Returns:
+        thermal_diffusivity (float): units of m^2/s
+    """
+    return thermal_conductivity/(density * specific_heat_capacity)
