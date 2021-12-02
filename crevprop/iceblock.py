@@ -1,6 +1,6 @@
 """ 
 IceBlock
---------
+ --  --  --  -- 
 The main container for the crevasse propagation model, holding and 
 initializing model geometry.
 
@@ -79,6 +79,8 @@ class ThermalModel:
         self.T_upglacier = self._set_upstream_BC(T_profile)
         # left = upglacier end, right = downglacier
         self.T = np.outer(self.T_upglacier, np.linspace(1, 0.99, self.x.size))
+        self.Tdf = pd.DataFrame(
+            data=self.T, index=self.z, columns=np.round(self.x))
 
     def _diffusion_lengthscale(self):
         return np.sqrt(1.090952729018252e-6 * self.dt)
@@ -86,16 +88,16 @@ class ThermalModel:
     def _toarray(self, start, stop, step):
         return np.linspace(start, stop, abs(round((start-stop)/step))+1)
 
-    def _set_upstream_BC(self, Tprofile) -> np.ndarray:
+    def _set_upstream_bc(self, Tprofile):
         """interpolate temperature profile data points to match z res.
 
         Args:
-            Tprofile [Tuple(array, array), pd.DataFrame]: Temperature profile data 
-                points. temperature, elevation = Tuple
+            Tprofile [Tuple(array, array), pd.DataFrame]: Temperature 
+                profile data points. temperature, elevation = Tuple
                 your array must be structured such that 
 
         Returns:
-            [np.array]: Ice temperatures fo
+            [np.array]: Ice temperatures for entire ice block in deg C.
         """
         # interpolate temperature profile to match z (vertical resolution.)
         if isinstance(Tprofile, pd.DataFrame):
@@ -107,11 +109,20 @@ class ThermalModel:
             t, z = Tprofile
 
         T = np.interp(self.z, z, t)
+
         # smooth temperature profile with a 25 m window
         win = round(self.dz*25+2)
         T = pd.Series(T[:win]).append(pd.Series(T).rolling(
             win, min_periods=1, center=True).mean()[win:])
+
         # apply basal temperature condition
         idx = 0 if z[0] < -1 else -1
         T[idx] = self.T_bed
+
         return T.values
+
+    def t_resample(self, dz):
+        if dz % self.dz == 0:
+            T = self.Tdf[self.Tdf.index.isin(self.z[::dz].tolist())].values
+        # ToDo add else statement/another if statement
+        return T
