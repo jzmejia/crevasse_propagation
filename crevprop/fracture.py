@@ -6,7 +6,7 @@ fracture.py
 
 Model Geometry
 
-  → x
+  + → x
   ↓ 
   z                
                  
@@ -15,9 +15,9 @@ Model Geometry
     ⎜      \<-- D(z) -->/                    ⎟
     ⎜       \          /                     ⎟
     d        \--------/  <--- water surface  ⎦
-    ⎜         \      /
-    ⎜          \    /
-    ⎜           \  /
+    ⎜         \wwwwww/
+    ⎜          \wwww/
+    ⎜           \ww/
     ⎣  crevasse  \/
         depth
 
@@ -34,8 +34,11 @@ import math as math
 
 
 # STRESS INTENSITY FACTOR
-# For a fracture to propagate KI (the stress intensity factor)
-# which describes the stresses at the fracture's tip must reach
+# For a fracture to propagate 
+#        KI >= KIC
+# stress @ crev tip must >= fracture toughness of ice
+# where KI is the stress intensity factor
+# which describes the stresses at the fracture's tip
 # the material's fracture toughness (KIC)
 
 

@@ -68,7 +68,7 @@ class ThermalModel:
         self.dt = dt_T
         self.dx = (0.5*self.length) / round(0.5*self.length /
                                             self._diffusion_lengthscale())
-        self.dz = dz
+        self.dz = dz if self._ge(dz, 5) else 5
         self.z = np.arange(-self.ice_thickness, self.dz, self.dz) if isinstance(
             self.dz, int) else self._toarray(-self.ice_thickness, self.dz, self.dz)
         self.x = self._toarray(-self.dx-self.length, 0, self.dx)
@@ -76,7 +76,7 @@ class ThermalModel:
         # Boundary Conditions
         self.T_surface = T_surface if T_surface else 0
         self.T_bed = T_bed if T_bed else 0
-        self.T_upglacier = self._set_upstream_BC(T_profile)
+        self.T_upglacier = self._set_upstream_bc(T_profile)
         # left = upglacier end, right = downglacier
         self.T = np.outer(self.T_upglacier, np.linspace(1, 0.99, self.x.size))
         self.Tdf = pd.DataFrame(
@@ -84,6 +84,9 @@ class ThermalModel:
 
     def _diffusion_lengthscale(self):
         return np.sqrt(1.090952729018252e-6 * self.dt)
+
+    def _ge(self, n, thresh):
+        return True if n >= thresh else False
 
     def _toarray(self, start, stop, step):
         return np.linspace(start, stop, abs(round((start-stop)/step))+1)
@@ -126,3 +129,7 @@ class ThermalModel:
             T = self.Tdf[self.Tdf.index.isin(self.z[::dz].tolist())].values
         # ToDo add else statement/another if statement
         return T
+
+    def A_matrix(self):
+        sx = pc.THERMAL_DIFFUSIVITY * self.dt / self.dx ** 2
+        sz = pc.THERMAL_DIFFUSIVITY * self.dt / self.dz ** 2
