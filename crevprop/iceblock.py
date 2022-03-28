@@ -114,7 +114,7 @@ class ThermalModel:
         T = np.interp(self.z, z, t)
 
         # smooth temperature profile with a 25 m window
-        win = round(self.dz*25+2)
+        win = self.dz*25+2
         T = pd.Series(T[:win]).append(pd.Series(T).rolling(
             win, min_periods=1, center=True).mean()[win:])
 
