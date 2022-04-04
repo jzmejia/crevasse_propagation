@@ -1,0 +1,10 @@
+# Don't track the content of these folders
+.ipynb_checkpoints/
+.vscode/
+
+.DS_store
+
+*dev.ipynb
+ice_temperature.png
+
+
