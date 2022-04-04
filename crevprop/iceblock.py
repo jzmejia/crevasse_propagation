@@ -133,3 +133,7 @@ class ThermalModel:
     def A_matrix(self):
         sx = pc.THERMAL_DIFFUSIVITY * self.dt / self.dx ** 2
         sz = pc.THERMAL_DIFFUSIVITY * self.dt / self.dz ** 2
+
+        A = np.eye()
+
+        return A
