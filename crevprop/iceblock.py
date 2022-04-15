@@ -17,7 +17,6 @@ from typing import (
     Any,
     Optional,
     Union,
-    TypeVar
 )
 import numpy as np
 import pandas as pd
@@ -33,11 +32,41 @@ class IceBlock(object):
         crev_spacing,
         timestep,
         thermal_freq,
-        T_profile=None,
+        T_profile,
         T_surface=None,
         T_bed=None,
         u_surf=100.
     ):
+        """A 2-dimensional container containing model domain elements.
+        
+        
+        Parameters
+        ----------
+        ice_thickness : float, int
+            thickness of ice block in meters
+        dz : float, int
+            vertical sampling resolution within ice block (m)
+        dx : float, int
+        crev_spacing : float, int
+            Crevasse spacing (m)
+        timestep : float
+            Timestep in days to run crevasse model
+        thermal_freq : float, int
+            Multiple of timestep to run thermal model. 1 would run the 
+            thermal model at every timestep whereas a value of 10 would 
+            run the model after every 10 timesteps.
+        T_profile : np.array, pd.Series, pd.DataFrame, optional
+            Temperature profile for upstream boundary condition. The 
+            profile will be interpolated to match the thermal model's 
+            vertical resolution.
+        T_surface : float, optional
+            Ice surface temperature, degrees C. Defaults to 0.
+        T_bed (_type_, optional): 
+            Temperature boundary condition at Defaults to None.
+        u_surf (float, optional): 
+            Ice surface velocity within domain (meters per year).
+            Defaults to 100.
+        """
 
         self.ice_thickness = ice_thickness
         self.dx = dx
@@ -87,6 +116,30 @@ class ThermalModel(object):
         T_surface=None,
         T_bed=None
     ):
+        """Apply temperature advection and diffusion through ice block.
+
+        Parameters
+        ----------
+        ice_thickness : int, float
+            ice thickness in meters.
+        length : int, float
+            Length of model domain in the x-direction (m).
+        dt_T : int, float
+            thermal model timestep in seconds.
+        dz : int, float:
+            vertical resolution for domain (m). Value is set to 5 m if 
+            input value is below 5 to reduce computational load. 
+        T_profile : pd.Series, pd.DataFrame, np.Array
+            Temperatures within ice column to set upstream boundary 
+            condition within ice block. Temperatures in deg C with 
+            corresponding depth from ice surface (m). 
+        T_surface : float, int
+            Air temperature in deg C. Defaults to 0.
+        T_bed : float, int
+            Temperature at ice-bed interface in deg C. Defaults to None.
+        """
+        
+        
         self.length = length
         self.ice_thickness = ice_thickness
         self.dt = dt_T
