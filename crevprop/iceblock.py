@@ -24,7 +24,7 @@ from typing import (
 )
 
 from .physical_constants import DENSITY_ICE, DENSITY_WATER, FRACTURE_TOUGHNESS, POISSONS_RATIO, g, pi
-import crevprop.physical_constants as pc
+from . import physical_constants as pc
 
 
 class IceBlock(object):
