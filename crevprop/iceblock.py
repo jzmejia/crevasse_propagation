@@ -35,18 +35,22 @@ class IceBlock(object):
         dz,
         dt,
         crev_spacing,
+        crev_count=None,
         thermal_freq=10,
         T_profile=None,
         T_surface=None,
         T_bed=None,
-        t=None,
         u_surf=100.,
         fracture_toughness=FRACTURE_TOUGHNESS,
         ice_density=DENSITY_ICE
     ):
         """A 2-D container containing model domain elements.
-        
-        
+
+        NOTE: At present IceBlock will only be able to be called from scratch, 
+        initialing upon call. i.e., an existing crevasse field at time t!=0 is
+        not currently supported.
+
+
         Parameters
         ----------
         ice_thickness : float, int
@@ -87,37 +91,42 @@ class IceBlock(object):
         # material properties
         self.density = ice_density
         self.fracture_toughness = fracture_toughness
-        
-        
+
         # time domain
-
         self.dt = dt * pc.SECONDS_IN_DAY
-        
-        
-        # ice block geometry
+        # self.t = 0
 
+        # ice block geometry
         self.ice_thickness = ice_thickness
         self.dx = dx
         self.dz = dz
         self.u_surf = u_surf
-        self.length = self.crev_count * self.crev_spacing + self.u_surf
+
+        # crevasse field
         self.crev_spacing = crev_spacing
-        self.crev_count = 1
+        self.crev_count = crev_count if crev_count else 1
+        self.crev_locs = [(-self.length, -3)]
         
+        
+        
+        self.x, self.z, self.length = self._init_geometry()
+        
+
         # temperature field
         self.dt_T = self._thermal_timestep(dt, thermal_freq)
         self.temperature = self._init_temperatures(T_profile, T_surface, T_bed)
-        
 
-    def get_length(self):
-        pass
+    # def get_length(self):
+    #     pass
+
+    # def set_length(self):
+    #     # if hasattr(self,"length"):
+
+    #     pass
     
-    def set_length(self):
-        # if hasattr(self,"length"):
-            
-        pass
-    
-    
+    def _toarray(self, start, stop, step):
+        return np.linspace(start, stop, abs(round((start-stop)/step))+1)
+
     def _init_geometry(self):
         """initialize ice block geometry
         """
@@ -139,7 +148,14 @@ class IceBlock(object):
 
     def _init_temperatures(self, T_profile, T_surface, T_bed):
         return ThermalModel(self.ice_thickness, self.length, self.dt_T,
-                         self.dz, T_profile, T_surface, T_bed) if T_profile else None
+                            self.dz, self.crev_locs, T_profile, T_surface, T_bed) if T_profile else None
+
+
+
+
+
+
+
 
 
 class ThermalModel(object):
@@ -149,6 +165,7 @@ class ThermalModel(object):
         length: Union[int, float],
         dt_T: Union[int, float],
         dz: Union[int, float],
+        crevasses,
         T_profile,
         T_surface=None,
         T_bed=None
@@ -175,7 +192,7 @@ class ThermalModel(object):
         T_bed : float, int
             Temperature at ice-bed interface in deg C. Defaults to None.
         """
-        
+
         # geometry
         self.length = length
         self.ice_thickness = ice_thickness
@@ -186,7 +203,8 @@ class ThermalModel(object):
         self.z = np.arange(-self.ice_thickness, self.dz, self.dz) if isinstance(
             self.dz, int) else self._toarray(-self.ice_thickness, self.dz, self.dz)
         self.x = self._toarray(-self.dx-self.length, 0, self.dx)
-
+        
+        self.crevasses = crevasses
 
         # Boundary Conditions
         self.T_surface = T_surface if T_surface else 0
@@ -200,13 +218,13 @@ class ThermalModel(object):
         # self.crev_locs = 0
 
     def _diffusion_lengthscale(self):
-        return np.sqrt(1.090952729018252e-6 * self.dt)
+        return np.sqrt(1.090952729e-6 * self.dt)
 
     def _ge(self, n, thresh):
         return True if n >= thresh else False
 
     def _toarray(self, start, stop, step):
-        return np.linspace(start, stop, abs(round((start-stop)/step))+1)
+        return np.arange(start,stop,step)
 
     def _set_upstream_bc(self, Tprofile):
         """interpolate temperature profile data points to match z res.
@@ -266,19 +284,36 @@ class ThermalModel(object):
                             temperatures within the ice block 
         """
         nx = self.x.size
+        nz = self.z.size
 
         sx = pc.THERMAL_DIFFUSIVITY * self.dt / self.dx ** 2
         sz = pc.THERMAL_DIFFUSIVITY * self.dt / self.dz ** 2
 
+        # Apply crevasse location boundary conditions to A 
+        # by creating a list of matrix indicies that shouldn't be assigned
+        crev_idx = []
+        for crev in self.crevasses:
+            # surface coordinate already covered by surface boundary condition
+            # use to find depth values
+            crev_x = (nx * nz - 1) - abs(round(crev[0]/self.dx))
+            crev_depth = crev[1]
+            if crev_depth >= 2*self.dz and crev_depth < self.ice_thickness:
+                crev_idx.append(np.arange(crev_x-(np.floor(crev_depth/self.dz)-1)*nx,crev_x,nx))
+                
+            
+            
         # create inversion matrix A
         A = np.eye(self.T.size)
+        
         for i in range(nx, self.T.size - nx):
             if i % nx != 0 and i % nx != nx-1:
                 A[i, i] = 1 + 2*sx + 2*sz
                 A[i, i-nx] = A[i, i+nx] = -sz
                 A[i, i+1] = A[i, i-1] = -sx
 
-        # Apply crevasse location boundary conditions to A
+
+            
+            
         return A
 
     def _execute(self):
@@ -330,10 +365,14 @@ class ThermalModel(object):
         return thermal_conductivity/(density * specific_heat_capacity)
 
 
-class CrevasseField():
-    pass
 
-
+# class CrevasseField:
+#     def __init__(self,
+#                  crev_spacing,
+#                  crev_count=None
+#                  ):
+#         self.crev_spacing = crev_spacing
+#         self.crev_count = crev_count if crev_count else 1
 
 
 class Crevasse:
@@ -342,20 +381,16 @@ class Crevasse:
         self.ice_thickness = None
         self.Rxx = None
         self.depth = None
-        
-        
+
         # forcing
         self.Qin = Qin
-        
-        # creasse geometry 
+
+        # creasse geometry
         self.D = None
-        
-        
+
         # water
         self.water_depth = self.depth - self.calc_water_height()
-        
-        
-        
+
     def F(self, use_approximation=False):
         """Finite ice thickness correction for the stress intensity factor
 
@@ -383,7 +418,6 @@ class Crevasse:
             """
         p = P([1.12, -0.23, 10.55, -21.72, 30.39])
         return 1.12 if use_approximation else p(self.depth / self.ice_thickness)
-
 
     def tensile_stress(self):
         """
@@ -413,7 +447,6 @@ class Crevasse:
         """
         return self.F(self.depth, self.ice_thickness
                       ) * self.Rxx * sqrt(pi * self.depth)
-
 
     def calc_water_height(self):
         """calc water high in crevasse using van der Veen 2007
@@ -466,55 +499,55 @@ class Crevasse:
             )
             / (0.683 * DENSITY_WATER * g * sqrt(pi))
         ) ** (2 / 3)
-        
+
     def elastic_displacement(self, z, sigma_T, mu,
-                        alpha=(1-POISSONS_RATIO),
-                        has_water=True
-                        ):
+                             alpha=(1-POISSONS_RATIO),
+                             has_water=True
+                             ):
         # define D and alpha for a water-free crevasse
         sigma_A = self.applied_stress(sigma_T, self.depth,
-                                self.water_depth, has_water=has_water)
+                                      self.water_depth, has_water=has_water)
         # define constant to advoid repeated terms in D equation
         c1 = (2*alpha)/(mu*pi)
         D = (c1*pi*sigma_A * diff_squares(self.depth, z)
-            + c1*DENSITY_ICE*g*self.depth*diff_squares(self.depth, z)
-            - c1*DENSITY_ICE * g * z ** 2 * 0.5 *
-            np.log(sum_over_diff(self.depth, diff_squares(self.depth, z)))
-            )
+             + c1*DENSITY_ICE*g*self.depth*diff_squares(self.depth, z)
+             - c1*DENSITY_ICE * g * z ** 2 * 0.5 *
+             np.log(sum_over_diff(self.depth, diff_squares(self.depth, z)))
+             )
         if has_water:
             c1 = c1 * DENSITY_WATER * g
-            D = (D 
-                 - c1 * diff_squares(self.depth, self.water_depth) * diff_squares(self.depth, z)
-                + (c1 * (z**2-self.water_depth**2)*0.5*np.log(abs(sum_over_diff(
+            D = (D
+                 - c1 * diff_squares(self.depth, self.water_depth) *
+                 diff_squares(self.depth, z)
+                 + (c1 * (z**2-self.water_depth**2)*0.5*np.log(abs(sum_over_diff(
                     diff_squares(self.depth, self.water_depth), diff_squares(self.depth, z)))))
-                - c1*self.water_depth*z*np.log(abs(sum_over_diff(self.water_depth*diff_squares(
-                    self.depth, z), z*diff_squares(self.depth, self.water_depth))))
-                + c1*self.water_depth**2 *
-                np.log(abs(sum_over_diff(diff_squares(self.depth,z),
-                        diff_squares(self.depth, self.water_depth))))
-                )
+                 - c1*self.water_depth*z*np.log(abs(sum_over_diff(self.water_depth*diff_squares(
+                     self.depth, z), z*diff_squares(self.depth, self.water_depth))))
+                 + c1*self.water_depth**2 *
+                 np.log(abs(sum_over_diff(diff_squares(self.depth, z),
+                                          diff_squares(self.depth, self.water_depth))))
+                 )
         return abs(D)
-    
+
     def sigma(self):
         return (self.sigma_T - (2 * DENSITY_ICE * g * self.depth) / pi
-            - DENSITY_WATER * g * self.water_depth
-            + (2/pi)*DENSITY_WATER * g * self.water_depth * math.asin(
+                - DENSITY_WATER * g * self.water_depth
+                + (2/pi)*DENSITY_WATER * g * self.water_depth * math.asin(
                 self.water_depth/self.depth)
-            + ((2*DENSITY_WATER*g) / pi) * math.sqrt(
+                + ((2*DENSITY_WATER*g) / pi) * math.sqrt(
                 self.depth ** 2 - self.water_depth ** 2)
-        )
-
+                )
 
     def applied_stress(self, has_water=False):
         sigma_A = self.traction_stress - (2*DENSITY_ICE*g*self.depth)/pi
         if has_water:
             sigma_A = (sigma_A
-                   - DENSITY_WATER*g*self.water_depth
-                   + (2/pi) * DENSITY_WATER * g * self.water_depth *
-                   np.arcsin(self.water_depth/self.depth)
-                   + (2 * DENSITY_WATER * g * (
-                       self.depth**2 - self.water_depth**2)**(.5)) / pi
-                   )
+                       - DENSITY_WATER*g*self.water_depth
+                       + (2/pi) * DENSITY_WATER * g * self.water_depth *
+                       np.arcsin(self.water_depth/self.depth)
+                       + (2 * DENSITY_WATER * g * (
+                           self.depth**2 - self.water_depth**2)**(.5)) / pi
+                       )
         return sigma_A
 
 
@@ -527,8 +560,6 @@ def alpha(dislocation_type="edge", crack_opening_mode=None):
         print(f'incorrect inputs to function, assuming an edge dislocation alpha=1-v')
         alpha = 1 - POISSONS_RATIO
     return alpha
-
-
 
 
 # math helper functions to simplify the
@@ -556,9 +587,7 @@ def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
     """
     return ice_density - (ice_density - snow_density) * np.exp(-C*depth)
 
-        
-        
-        
+
 """
 fracture.py
 
@@ -586,15 +615,10 @@ Model Geometry
 """
 
 
-
-
-
 # STRESS INTENSITY FACTOR
-# For a fracture to propagate 
+# For a fracture to propagate
 #        KI >= KIC
 # stress @ crev tip must >= fracture toughness of ice
 # where KI is the stress intensity factor
 # which describes the stresses at the fracture's tip
 # the material's fracture toughness (KIC)
-
-
