@@ -298,7 +298,7 @@ class ThermalModel(object):
             crev_x = (nx * nz - 1) - abs(round(crev[0]/self.dx))
             crev_depth = crev[1]
             if crev_depth >= 2*self.dz and crev_depth < self.ice_thickness:
-                crev_idx.append(np.arange(crev_x-(np.floor(crev_depth/self.dz)-1)*nx,crev_x,nx))
+                crev_idx.extend(np.arange(crev_x-(np.floor(crev_depth/self.dz)-1)*nx,crev_x,nx))
                 
             
             
@@ -306,7 +306,7 @@ class ThermalModel(object):
         A = np.eye(self.T.size)
         
         for i in range(nx, self.T.size - nx):
-            if i % nx != 0 and i % nx != nx-1:
+            if i % nx != 0 and i % nx != nx-1 and i not in crev_idx:
                 A[i, i] = 1 + 2*sx + 2*sz
                 A[i, i-nx] = A[i, i+nx] = -sz
                 A[i, i+1] = A[i, i-1] = -sx
