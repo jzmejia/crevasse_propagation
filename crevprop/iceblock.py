@@ -158,6 +158,8 @@ class IceBlock(object):
 
 
 
+
+
 class ThermalModel(object):
     def __init__(
         self,
@@ -168,7 +170,8 @@ class ThermalModel(object):
         crevasses,
         T_profile,
         T_surface=None,
-        T_bed=None
+        T_bed=None,
+        solver=None
     ):
         """Apply temperature advection and diffusion through ice block.
 
@@ -212,9 +215,13 @@ class ThermalModel(object):
         self.T_upglacier = self._set_upstream_bc(T_profile)
         # left = upglacier end, right = downglacier
         self.T = np.outer(self.T_upglacier, np.linspace(1, 0.99, self.x.size))
+        self.T0 = None
+        self.Tnm1 = None
         self.Tdf = pd.DataFrame(
             data=self.T, index=self.z, columns=np.round(self.x))
         self.T_crev = 0
+        
+        self.solver = solver if solver else "explicit"
         # self.crev_locs = 0
 
     def _diffusion_lengthscale(self):
@@ -264,6 +271,7 @@ class ThermalModel(object):
             T = self.Tdf[self.Tdf.index.isin(self.z[::dz].tolist())].values
         # ToDo add else statement/another if statement
         return T
+    
 
     def A_matrix(self):
         """create the A matrix to solve for future temperatures
@@ -277,7 +285,7 @@ class ThermalModel(object):
               to be recalculated. 
 
         WARNING: Function does not currently add boundary conditions for
-        crevasse locations. 
+        creTvasse locations. 
 
         Returns:
             A (np.ndarray): square matrix with coefficients to calculate
@@ -311,14 +319,18 @@ class ThermalModel(object):
                 A[i, i-nx] = A[i, i+nx] = -sz
                 A[i, i+1] = A[i, i-1] = -sx
 
-
-            
-            
         return A
 
+
+    
     def _execute(self):
         """Solve for future temp w/ implicit finite difference scheme
+        
+        Solve for future temperatures while storing temperature fields for
+        the the previous two timesteps 
         """
+        A = self.A_matrix()
+        
         pass
 
     def thermal_conductivity(density):
