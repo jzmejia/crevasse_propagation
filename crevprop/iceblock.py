@@ -7,6 +7,21 @@ initializing model geometry.
 
 
 
+Note to self: To do - July 2022
+- [ ] create solver for thermal model (A matrix created, 
+      invert w/ current temperatures)   
+- [ ] create crevasse field or similar to store crevasse info   
+- [ ] implement refreezing in `Crevasse` class
+      this will move refreezing calc from `ThermalModel`
+      **requires** ThermalModel outputting necessary terms to parent
+      `IceBlock` so they can be accessed by `Crevasse`. 
+- [ ] figure out proj structure, move classes into individual files or delete.  
+- [ ] implement documentation package for model
+- [ ] figure out how to store data for plotting/model outputs, use `dataclass`?  
+- [ ] clean up methods by creating *Mixins*
+
+
+
 """
 import numpy as np
 from numpy.lib.function_base import diff
@@ -283,9 +298,6 @@ class ThermalModel(object):
         NOTE: As the iceblock advects downglacier and the domain's length
               increases until reaching the specified maximum A will need
               to be recalculated. 
-
-        WARNING: Function does not currently add boundary conditions for
-        creTvasse locations. 
 
         Returns:
             A (np.ndarray): square matrix with coefficients to calculate
