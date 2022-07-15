@@ -1,3 +1,10 @@
+# Need to update this file by 
+# 1. switching filename to all caps
+# 2. grouping valuables
+# 3. using enum? this way you can access units
+
+
+
 import numpy as np
 
 SECONDS_IN_DAY = 60 * 60 * 24

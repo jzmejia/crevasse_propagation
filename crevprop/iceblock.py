@@ -6,7 +6,7 @@ initializing model geometry.
 
 
 
-
+-------
 Note to self: To do - July 2022
 - [ ] create solver for thermal model (A matrix created, 
       invert w/ current temperatures)   
@@ -19,9 +19,6 @@ Note to self: To do - July 2022
 - [ ] implement documentation package for model
 - [ ] figure out how to store data for plotting/model outputs, use `dataclass`?  
 - [ ] clean up methods by creating *Mixins*
-
-
-
 """
 import numpy as np
 from numpy.lib.function_base import diff
@@ -93,7 +90,7 @@ class IceBlock(object):
             Temperature boundary condition at Defaults to None.
         u_surf : float, optional
             Ice surface velocity within domain (meters per year).
-            Defaults to 100.
+            Defaults to 100 (m/year).
         fracture_toughness : float
             value to use for fracture toughness of ice (kPa), defaults 
             to value defined in physical_constants.py (0.1 kPa)
