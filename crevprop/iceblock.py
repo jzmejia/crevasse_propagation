@@ -5,20 +5,6 @@ The main container for the crevasse propagation model, holding and
 initializing model geometry.
 
 
-
--------
-Note to self: To do - July 2022
-- [ ] create solver for thermal model (A matrix created, 
-      invert w/ current temperatures)   
-- [ ] create crevasse field or similar to store crevasse info   
-- [ ] implement refreezing in `Crevasse` class
-      this will move refreezing calc from `ThermalModel`
-      **requires** ThermalModel outputting necessary terms to parent
-      `IceBlock` so they can be accessed by `Crevasse`. 
-- [ ] figure out proj structure, move classes into individual files or delete.  
-- [ ] implement documentation package for model
-- [ ] figure out how to store data for plotting/model outputs, use `dataclass`?  
-- [ ] clean up methods by creating *Mixins*
 """
 import numpy as np
 from numpy.lib.function_base import diff
@@ -39,8 +25,19 @@ from .physical_constants import DENSITY_ICE, DENSITY_WATER, POISSONS_RATIO
 from . import physical_constants as pc
 
 
+class IceBlock():
+    """A 2-D container containing model domain elements.
 
-class IceBlock(object):
+    Attributes
+    ----------
+
+    Methods
+    -------
+
+
+
+        """
+
     def __init__(
         self,
         ice_thickness,
@@ -57,13 +54,7 @@ class IceBlock(object):
         fracture_toughness=100e3,
         ice_density=DENSITY_ICE
     ):
-        """A 2-D container containing model domain elements.
-
-        NOTE: At present IceBlock will only be able to be called from scratch, 
-        initialing upon call. i.e., an existing crevasse field at time t!=0 is
-        not currently supported.
-
-
+        """
         Parameters
         ----------
         ice_thickness : float, int
@@ -119,11 +110,8 @@ class IceBlock(object):
         self.crev_spacing = crev_spacing
         self.crev_count = crev_count if crev_count else 1
         self.crev_locs = [(-self.length, -3)]
-        
-        
-        
+
         self.x, self.z, self.length = self._init_geometry()
-        
 
         # temperature field
         self.dt_T = self._thermal_timestep(dt, thermal_freq)
@@ -136,7 +124,7 @@ class IceBlock(object):
     #     # if hasattr(self,"length"):
 
     #     pass
-    
+
     def _toarray(self, start, stop, step):
         return np.linspace(start, stop, abs(round((start-stop)/step))+1)
 
@@ -164,15 +152,6 @@ class IceBlock(object):
                             self.dz, self.crev_locs, T_profile, T_surface, T_bed) if T_profile else None
 
 
-
-
-
-
-
-
-
-
-
 class ThermalModel(object):
     def __init__(
         self,
@@ -187,12 +166,12 @@ class ThermalModel(object):
         solver=None
     ):
         """Apply temperature advection and diffusion through ice block.
-        
-        
-        
-        
+
+
+
+
         Note on `ThermalModel` geometry and relationship to `IceBlock`
-        
+
         This class set's up the geometry of the thermal model which differs
         IceBlock. ThermalModel has a different horizontal (dx) and vertical (dz) 
         resolution within the 2D model domain of the IceBlock, whereby dx
@@ -221,9 +200,9 @@ class ThermalModel(object):
             Air temperature in deg C. Defaults to 0.
         T_bed : float, int
             Temperature at ice-bed interface in deg C. Defaults to None.
-            
-            
-            
+
+
+
         Attributes
         ----------
         dt : int, float
@@ -243,7 +222,7 @@ class ThermalModel(object):
         self.z = np.arange(-self.ice_thickness, self.dz, self.dz) if isinstance(
             self.dz, int) else self._toarray(-self.ice_thickness, self.dz, self.dz)
         self.x = self._toarray(-self.dx-self.length, 0, self.dx)
-        
+
         self.crevasses = crevasses
 
         # Boundary Conditions
@@ -252,12 +231,14 @@ class ThermalModel(object):
         self.T_upglacier = self._set_upstream_bc(T_profile)
         # left = upglacier end, right = downglacier
         self.T = np.outer(self.T_upglacier, np.linspace(1, 0.99, self.x.size))
+
+        # initialize temperatures used for leap-frog advection
         self.T0 = None
         self.Tnm1 = None
         self.Tdf = pd.DataFrame(
             data=self.T, index=self.z, columns=np.round(self.x))
         self.T_crev = 0
-        
+
         self.solver = solver if solver else "explicit"
         # self.crev_locs = 0
 
@@ -268,7 +249,7 @@ class ThermalModel(object):
         return True if n >= thresh else False
 
     def _toarray(self, start, stop, step):
-        return np.arange(start,stop,step)
+        return np.arange(start, stop, step)
 
     def _set_upstream_bc(self, Tprofile):
         """interpolate temperature profile data points to match z res.
@@ -308,11 +289,11 @@ class ThermalModel(object):
             T = self.Tdf[self.Tdf.index.isin(self.z[::dz].tolist())].values
         # ToDo add else statement/another if statement
         return T
-    
 
     # def _calc_thermal_diffusivity(self):
-        
-    #     return 
+
+    #     return
+
     def A_matrix(self):
         """create the A matrix to solve for future temperatures
 
@@ -334,7 +315,7 @@ class ThermalModel(object):
         sx = pc.THERMAL_DIFFUSIVITY * self.dt / self.dx ** 2
         sz = pc.THERMAL_DIFFUSIVITY * self.dt / self.dz ** 2
 
-        # Apply crevasse location boundary conditions to A 
+        # Apply crevasse location boundary conditions to A
         # by creating a list of matrix indicies that shouldn't be assigned
         crev_idx = []
         for crev in self.crevasses:
@@ -343,13 +324,12 @@ class ThermalModel(object):
             crev_x = (nx * nz - 1) - abs(round(crev[0]/self.dx))
             crev_depth = crev[1]
             if crev_depth >= 2*self.dz and crev_depth < self.ice_thickness:
-                crev_idx.extend(np.arange(crev_x-(np.floor(crev_depth/self.dz)-1)*nx,crev_x,nx))
-                
-            
-            
+                crev_idx.extend(
+                    np.arange(crev_x-(np.floor(crev_depth/self.dz)-1)*nx, crev_x, nx))
+
         # create inversion matrix A
         A = np.eye(self.T.size)
-        
+
         for i in range(nx, self.T.size - nx):
             if i % nx != 0 and i % nx != nx-1 and i not in crev_idx:
                 A[i, i] = 1 + 2*sx + 2*sz
@@ -358,22 +338,20 @@ class ThermalModel(object):
 
         return A
 
-
-    
     def _solve_for_T(self):
         """Solve for future temp w/ implicit finite difference scheme
-        
+
         Solve for future temperatures while storing temperature fields for
         the the previous two timesteps 
         """
         A = self.A_matrix()
-        
-        pass
-    
-    def refreezing(self):
-        bluelayer = self.dt * pc.THERMAL_CONDUCTIVITY_ICE / (pc.LATIENT_HEAT_OF_FUSION * DENSITY_ICE) * ()
+
         pass
 
+    def refreezing(self):
+        bluelayer = self.dt * pc.THERMAL_CONDUCTIVITY_ICE / \
+            (pc.LATIENT_HEAT_OF_FUSION * DENSITY_ICE) * ()
+        pass
 
 
 # class CrevasseField:
