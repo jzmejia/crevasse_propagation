@@ -35,8 +35,9 @@ from typing import (
     Union,
 )
 
-from .physical_constants import DENSITY_ICE, DENSITY_WATER, FRACTURE_TOUGHNESS, POISSONS_RATIO, g, pi
+from .physical_constants import DENSITY_ICE, DENSITY_WATER, POISSONS_RATIO
 from . import physical_constants as pc
+
 
 
 class IceBlock(object):
@@ -53,7 +54,7 @@ class IceBlock(object):
         T_surface=None,
         T_bed=None,
         u_surf=100.,
-        fracture_toughness=FRACTURE_TOUGHNESS,
+        fracture_toughness=100e3,
         ice_density=DENSITY_ICE
     ):
         """A 2-D container containing model domain elements.
@@ -186,6 +187,20 @@ class ThermalModel(object):
         solver=None
     ):
         """Apply temperature advection and diffusion through ice block.
+        
+        
+        
+        
+        Note on `ThermalModel` geometry and relationship to `IceBlock`
+        
+        This class set's up the geometry of the thermal model which differs
+        IceBlock. ThermalModel has a different horizontal (dx) and vertical (dz) 
+        resolution within the 2D model domain of the IceBlock, whereby dx
+        becomes a function of ice properties and model timestep, representing
+        the horizontal distance of thermal diffusion within the ice during the 
+        thermal model's timestep. dz (vertical or depth) spacing can differ from
+        IceBlock, as the thermal model will run with a corser vertical resolution
+        to save on computational expense. 
 
         Parameters
         ----------
@@ -206,14 +221,24 @@ class ThermalModel(object):
             Air temperature in deg C. Defaults to 0.
         T_bed : float, int
             Temperature at ice-bed interface in deg C. Defaults to None.
+            
+            
+            
+        Attributes
+        ----------
+        dt : int, float
+            thermal model timestep in seconds
+        diffusive_lengthscale: float
+
         """
 
         # geometry
         self.length = length
         self.ice_thickness = ice_thickness
         self.dt = dt_T
+        self.diffusive_lengthscale = self._diffusion_lengthscale()
         self.dx = (0.5*self.length) / round(0.5*self.length /
-                                            self._diffusion_lengthscale())
+                                            self.diffusive_lengthscale)
         self.dz = dz if self._ge(dz, 5) else 5
         self.z = np.arange(-self.ice_thickness, self.dz, self.dz) if isinstance(
             self.dz, int) else self._toarray(-self.ice_thickness, self.dz, self.dz)
@@ -285,6 +310,9 @@ class ThermalModel(object):
         return T
     
 
+    # def _calc_thermal_diffusivity(self):
+        
+    #     return 
     def A_matrix(self):
         """create the A matrix to solve for future temperatures
 
@@ -332,7 +360,7 @@ class ThermalModel(object):
 
 
     
-    def _execute(self):
+    def _solve_for_T(self):
         """Solve for future temp w/ implicit finite difference scheme
         
         Solve for future temperatures while storing temperature fields for
@@ -341,49 +369,10 @@ class ThermalModel(object):
         A = self.A_matrix()
         
         pass
-
-    def thermal_conductivity(density):
-        """
-        depth dependant thermal conductivity formula, Van Dusen 1929
-
-        note, this gives a lower limit in most cases
-
-        Args:
-            density (float): ice/snow density in kg/m^3
-        """
-        return 2.1e-2 + 4.2e-4 * density + 2.2e-9 * density**3
-
-    def specific_heat_capacity(temperature):
-        """specific heat capacity for pure ice of temperature in Kelvin
-
-        Specific heat capacity, c, per unit mass of ice in SI units. 
-        Note: c of dry snow and ice does not vary with density because the 
-        heat needed to warm the air and vapor between grains is neglibible.
-        (see Cuffey, ch 9, pp 400)
-
-        c = 152.5 + 7.122(T)
-
-        Args:
-            temperature (float): ice temperature in degrees Kelvin
-
-        Returns:
-            float : specific heat capacity (c) in Jkg^-1K^-1
-        """
-
-        return 152.5 + 7.122 * temperature
-
-    def thermal_diffusivity(thermal_conductivity, density, specific_heat_capacity):
-        """
-
-        Args:
-            thermal_conductivity (float): W/mK
-            density (float): kg/m^3
-            specific_heat_capacity (float): J/kgK
-
-        Returns:
-            thermal_diffusivity (float): units of m^2/s
-        """
-        return thermal_conductivity/(density * specific_heat_capacity)
+    
+    def refreezing(self):
+        bluelayer = self.dt * pc.THERMAL_CONDUCTIVITY_ICE / (pc.LATIENT_HEAT_OF_FUSION * DENSITY_ICE) * ()
+        pass
 
 
 
