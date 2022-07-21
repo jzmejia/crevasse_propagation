@@ -1,2 +1,4 @@
 sphinx==5.0.2
+numpydoc==1.4.0
+sphinx-material==0.0.35
 # furo==2021.11.16
