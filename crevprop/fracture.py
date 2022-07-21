@@ -1,37 +1,13 @@
 """
-fracture.py
-
-
-
-
-Model Geometry
-
-  + → x
-  ↓ 
-  z                
-                 
-‾‾‾‾⎡‾‾‾‾\                /‾‾‾‾‾‾‾‾‾         ⎤
-    ⎜     \              /                   ⎟
-    ⎜      \<-- D(z) -->/                    ⎟
-    ⎜       \          /                     ⎟
-    d        \--------/  <--- water surface  ⎦
-    ⎜         \wwwwww/
-    ⎜          \wwww/
-    ⎜           \ww/
-    ⎣  crevasse  \/
-        depth
-
-
+fracture mechanics used in crevasse propagation model
 """
-
-
 from numpy.lib.function_base import diff
-from .physical_constants import DENSITY_ICE, DENSITY_WATER, FRACTURE_TOUGHNESS, POISSONS_RATIO, g, pi
+from .physical_constants import DENSITY_ICE, DENSITY_WATER, FRACTURE_TOUGHNESS, POISSONS_RATIO
 import numpy as np
 from numpy import sqrt, abs
 from numpy.polynomial import Polynomial as P
 import math as math
-
+from scipy.constants import g, pi
 
 # STRESS INTENSITY FACTOR
 # For a fracture to propagate 
@@ -40,7 +16,6 @@ import math as math
 # where KI is the stress intensity factor
 # which describes the stresses at the fracture's tip
 # the material's fracture toughness (KIC)
-
 
 def F(crevasse_depth, ice_thickness, use_approximation=False):
     """Finite ice thickness correction for the stress intensity factor
@@ -53,32 +28,37 @@ def F(crevasse_depth, ice_thickness, use_approximation=False):
     tip plastic zone (i.e., area where plastic deformation occurs ahead
     of the crack's tip.).
 
-    NOTE: correction is only used for the tensile stress component of
-    K_I (mode 1)
+    .. note:
+        correction is only used for the tensile stress component of K_I (mode 1)
 
-    Args:
-        crevasse_depth : depth below surface in meters
-        ice_thickness : in meters
-        use_approximation (bool): defaults to False
-            if True return 1.12 instead of the polynomial expansion
+    Parameters
+    ----------
+    crevasse_depth : 
+        depth below surface in meters
+    ice_thickness : 
+        ice thickness in meters
+    use_approximation: bool
+        whether to use the shallow crevasse approximation. 
+        If `True` use 1.12 instead of the polynomial expansion, if `False`
+        use full polynomial expansion in calculation. Defaults to False.
 
-    Returns:
-        F(lambda) float : stress intensity correction factor
-
-
+    Returns
+    -------
+    F(lambda) float : stress intensity correction factor
     """
     p = P([1.12, -0.23, 10.55, -21.72, 30.39])
     return 1.12 if use_approximation else p(crevasse_depth / ice_thickness)
 
 
 def tensile_stress(Rxx, crevasse_depth, ice_thickness):
-    """[summary]
+    """Calculate the stress intensity factor's tensile compoent.
 
-    <Note: an approximatioin of the polynomial coefficient can be used
-    if the ratio between crevasse_depth and ice thickness is less than
-    0.2. Future work could add an if statement, but should test if the
-    full computation with numpy.polynomial.Polynomial is faster than the
-    conditional.>
+    .. note:
+        an approximatioin of the polynomial coefficient can be 
+        used if the ratio between crevasse_depth and ice thickness 
+        is less than 0.2. Future work could add an if statement, 
+        but should test if the full computation with 
+        numpy.polynomial.Polynomial is faster than the conditional.
 
     Equation from van der Veen 1998
     stress intensity factor K_I(1) = F(lambda)*Rxx*sqrt(pi*crevasse_depth)
@@ -89,13 +69,18 @@ def tensile_stress(Rxx, crevasse_depth, ice_thickness):
     For shallow crevasses
         F(lambda->0) = 1.12 * Rxx * sqrt(pi*crevasse_depth)
 
-    Args:
-        Rxx (): far-field stress or tensile resistive stress
-        crevasse_depth (float): crevasse depth below ice surface in m
-        ice_thickness (float): ice thickness in meters
+    Parameters
+    ----------
+    Rxx: 
+        far-field stress or tensile resistive stress
+    crevasse_depth: float
+        crevasse depth below ice surface in m
+    ice_thickness: float
+        ice thickness in meters
 
-    Returns:
-        stress intensity factor's tensile component
+    Returns
+    -------
+    stress intensity factor's tensile component
     """
     return F(crevasse_depth, ice_thickness) * Rxx * sqrt(pi * crevasse_depth)
 
@@ -126,28 +111,32 @@ def water_height(
                       + 0.683 * ice_density * g * ice_thickness**1.5)
                       / 0.683 * water_density * g )**2/3
 
-    Assumptions:
-        - Rxx is constant with depth - not accounting for firn
-    Note:
+    Assumptions
+    -----------
+        Rxx is constant with depth - not accounting for firn
+        
+    .. note:
+    
         using the function `tensile_stress()` will calculate the full
         tensile stress term instead of using the approximation of 1.12
         shown in equations 2 and 3. An if statement can be added,
         however, numpy's polynomial function is quite fast.
 
-    Args:
-        Rxx ([type]): far field tensile stress
-        crevasse_depth (float): crevasse depth below ice surface (m)
-        fracture_toughness (float): fracture toughness of ice
-            units of MPa*m^1/2
-        ice_thickness (float): ice thickness in meters
-        ice_density (float, optional): [description].
-                    Defaults to DENSITY_ICE = 917 kg/m^3.
+    Arguements
+    ----------
+    Rxx ([type]): far field tensile stress
+    crevasse_depth (float): crevasse depth below ice surface (m)
+    fracture_toughness (float): fracture toughness of ice
+        units of MPa*m^1/2
+    ice_thickness (float): ice thickness in meters
+    ice_density (float, optional): [description].
+                Defaults to DENSITY_ICE = 917 kg/m^3.
 
-    Returns:
-        water_height (float): water height above crevasse bottom (m)
-            values (0, crevasse_depth) -> boundaries rep a water-free
-            crevasse (=0) or a copletely full crevasse (=crevase_depth).
-
+    Returns
+    -------
+    water_height (float): water height above crevasse bottom (m)
+        values (0, crevasse_depth) -> boundaries rep a water-free
+        crevasse (=0) or a copletely full crevasse (=crevase_depth).
     """
     return (
         (
@@ -186,6 +175,22 @@ def sigma(
 
 
 def applied_stress(traction_stress, crevasse_depth, water_depth, has_water=False):
+    """calculated applied stress (sigma_A)
+
+    Parameters
+    ----------
+    traction_stress
+    crevasse_depth: 
+        crevasse depth in meters from ice surface
+    water_depth : (float, int)
+        distance from ice surface to water column within crevasse in meters.
+    has_water : (bool, optional)
+        Is there water within the crevasse? Defaults to False.
+
+    Returns
+    -------
+        sigma_A
+    """
     sigma_A = traction_stress - (2*DENSITY_ICE*g*crevasse_depth)/pi
     if has_water:
         sigma_A = (sigma_A
@@ -216,6 +221,22 @@ def elastic_displacement(z,
                          alpha=(1-POISSONS_RATIO),
                          has_water=True
                          ):
+    """_summary_
+
+    Parameters
+    ----------
+    z
+    sigma_T : 
+    mu : 
+    crevasse_depth : (float, int)
+        distance between ice surface and crevasse tip in m (positive).
+    water_depth : 
+        distance between ice surface and water surface within crevasse (m).
+    alpha : (tuple, optional)
+        Defaults to (1-POISSONS_RATIO).
+    has_water : bool, optional
+        Is there water within the crevasse? Defaults to True.
+    """
     # define D and alpha for a water-free crevasse
     sigma_A = applied_stress(sigma_T, crevasse_depth,
                              water_depth, has_water=has_water)

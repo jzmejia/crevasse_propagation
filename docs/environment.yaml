@@ -1,0 +1,6 @@
+name: docs
+channels: 
+  - conda-forge
+  - defaults
+dependencies:
+  - sphinx==5.0.2

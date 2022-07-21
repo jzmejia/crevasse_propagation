@@ -1,52 +1,53 @@
 """
-temperature_field.py
+A two-dimensional thermal model used to solve for temperature
+within the ice block defining model geometry. 
 
+Solvers used include a semi-implicit finite-difference scheme
+staggered leapfrog method for vertical advection
+upward motion scaled linearly from -b at the ice surface to 0 at the bed
+the entire domain is advected horizontally at 200 m/a 
+Plug flow with Lagrangian reference frame
 
+For the plug flow simulation the model's domain expands for each 
+timestep at the upstream end of the horizontal model domain. 
+The amount of ice added at the upstream end is determined by
+the annual ice velocity `u`, which when applied, pushes the model
+domain downstream. Once the model's horzontal domain exceeds a 
+length of 500 m, we remove the uppermost 200 m of domain. This model configuration allows the model's domain to track the
+crevasse field as it advects downglacier and evolvs thermo-mechanically
 
-Components
-    1. Temperature of ice block
-        - determined from observations & boundary conditions
-    2. Refreezing
-
-
-2-D Thermal Model
-    - 0ºC for ice in contact with each crevasse
-
-    2-D semi-implicit finite-difference scheme
-    staggered leapfrog method for vertical advection
-        upward motion scaled linearly from -b @surface to 0 @bed
-        the entire domain is advected horizontally at 200 m/a 
-        ^ Plug flow with Lagrangian reference frame
-
-    Domain:
-        250 m long
-        200 m buffer region at the downstream end
-
-        Plug flow simulation
-        model domain expands in each timestep at the upstream end 
-        according to the ice velocity u, theregby pushing the domain
-        downstream
-
-        @500 m length, the upper 200 m is disgarded annually
-        We retain for use as an upstream boundary condition over the 
-        subsequent year (Poinar 2015)
-
-        This model configuration allows the model's domain to track the
-        crevasse field as it advects downglacier and evolvs thermo-mechanically
-
-    Thermal model components
-        - horizontal diffusion
-        - vertical diffusion
-        - latent heat transfer from refreezing
-        
-
-
+Thermal model components include
+- horizontal diffusion
+- vertical diffusion
+- latent heat transfer from refreezing
 """
 import numpy as np
 
 
 class PureIce:
+    """Thermal equations applicable to pure ice.
+    
+    Parameters
+    ----------
+    Temperature: float, int
+        Ice temperature in degrees Kelvin (K).
+    
+    Attributes
+    ----------
+    T: float, int
+        ice temperature in degrees Kelvin (K)
+    Lf: float
+        Latient heat of fusion for ice
+    density: float
+        density of pure ice
+    """
     def __init__(self, Temperature):
+        """
+        Parameters
+        ----------
+        Temperature : float
+            ice temperature in degree K.
+        """
         self.T = Temperature
         self.Lf = 333.5
         self.density = 9.17
@@ -66,11 +67,15 @@ class PureIce:
 
             c = 152.5 + 7.122(T)
 
-            Args:
-                temperature (float): ice temperature in degrees Kelvin
+            Parameters
+            ----------
+            temperature: float
+                ice temperature in degrees Kelvin
 
-            Returns:
-                float : specific heat capacity (c) in Jkg^-1K^-1
+            Returns
+            -------
+            c: float 
+                specific heat capacity of ice in Jkg^-1K^-1
             """
 
             return 152.5 + 7.122 * self.T
@@ -82,30 +87,36 @@ class PureIce:
 
 
 # for not pure ice
-
 def thermal_conductivity(density):
-    """
-    depth dependant thermal conductivity for dry snow, firn, and glacier ice
+    """Depth dependant thermal conductivity for dry snow, firn, and glacier ice
     Van Dusen 1929
 
-    note, this gives a lower limit in most cases
+    This equation typically gives a lower limit in most cases
 
-    Args:
-        density (float): ice/snow density in kg/m^3
+    Parameters
+    ----------
+    density : (float)
+        density of dry snow, firn, or glacier ice in kg/m^3
     """
     return 2.1e-2 + 4.2e-4 * density + 2.2e-9 * density**3
 
 
 
 def thermal_diffusivity(thermal_conductivity, density, specific_heat_capacity):
-    """
+    """ Thermal diffusivity calculation
+    
+    Parameters
+    ----------
+    thermal_conductivity : (float)
+        in W/mK
+    density : (float) 
+        kg/m^3
+    specific_heat_capacity : (float)
+        J/kgK
 
-    Args:
-        thermal_conductivity (float): W/mK
-        density (float): kg/m^3
-        specific_heat_capacity (float): J/kgK
-
-    Returns:
-        thermal_diffusivity (float): units of m^2/s
+    Returns
+    -------
+    thermal_diffusivity : (float)
+        units of m^2/s
     """
     return thermal_conductivity/(density * specific_heat_capacity)
