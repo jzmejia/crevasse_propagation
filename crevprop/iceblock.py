@@ -1,15 +1,13 @@
-""" 
-IceBlock
- --  --  --  -- 
+"""
 The main container for the crevasse propagation model, holding and 
 initializing model geometry.
-
-
 """
 import numpy as np
 from numpy.lib.function_base import diff
 from numpy import sqrt, abs
 from numpy.polynomial import Polynomial as P
+from scipy.constants import g, pi
+
 import math as math
 import pandas as pd
 from typing import (
@@ -26,18 +24,46 @@ from . import physical_constants as pc
 
 
 class IceBlock():
-    """A 2-D container containing model domain elements.
-
+    """
+    Two-dimensional ice block geometry defining model domain.
+    
     Attributes
     ----------
-
-    Methods
-    -------
-
-
-
-        """
-
+    ice_thickness : float, int
+        thickness of ice block in meters
+    dx : float, int
+        horizontal (x-coordinate) sampling within ice block (m)
+    dz : float, int
+        vertical sampling resolution within ice block (m)
+    dt : float, int
+        Timestep in days to run crevasse model (days)
+    crev_spacing : float, int
+        Spacing between crevasses in crevasse field (m)
+    thermal_freq : float, int
+        Multiple of timestep to run thermal model. 1 would run the 
+        thermal model at every timestep whereas a value of 10 would 
+        run the model after every 10 timesteps. Defaults to 10.
+    T_profile : np.array, pd.Series, pd.DataFrame, optional
+        Temperature profile for upstream boundary condition. The 
+        profile will be interpolated to match the thermal model's 
+        vertical resolution. A value for T_profile is required to 
+        run ThermalModel.
+    T_surface : float, optional
+        Ice surface temperature, degrees C. Defaults to 0.
+    T_bed : float, int, optional
+        Temperature boundary condition at Defaults to None.
+    u_surf : float, optional
+        Ice surface velocity within domain (meters per year).
+        Defaults to 100 (m/year).
+    fracture_toughness : float
+        value to use for fracture toughness of ice (kPa), defaults 
+        to value defined in physical_constants.py (0.1 kPa)
+    ice_density : float, int
+        ice density to use throughout ice block in units of kg/m^3.
+        Defaults to value set in physical_constants.py (917 kg/m^3)
+    .. note: 
+        future versions aim to allow a density profile.
+    """
     def __init__(
         self,
         ice_thickness,
@@ -89,7 +115,7 @@ class IceBlock():
         ice_density : float, int
             ice density to use throughout ice block in units of kg/m^3.
             Defaults to value set in physical_constants.py (917 kg/m^3)
-            NOTE: future versions aim to allow a density profile.
+            future versions aim to allow a density profile.
         """
 
         # material properties
@@ -254,13 +280,16 @@ class ThermalModel(object):
     def _set_upstream_bc(self, Tprofile):
         """interpolate temperature profile data points to match z res.
 
-        Args:
-            Tprofile [Tuple(array, array), pd.DataFrame]: Temperature 
-                profile data points. temperature, elevation = Tuple
-                your array must be structured such that 
+        Parameters
+        ----------
+        Tprofile : [Tuple(array, array), pd.DataFrame]
+            Temperature profile data points. temperature, elevation = Tuple
+            your array must be structured such that 
 
-        Returns:
-            [np.array]: Ice temperatures for entire ice block in deg C.
+        Returns
+        -------
+        : np.array
+            Ice temperatures for entire ice block in deg C.
         """
         # interpolate temperature profile to match z (vertical resolution.)
         if isinstance(Tprofile, pd.DataFrame):
@@ -301,11 +330,13 @@ class ThermalModel(object):
                         throughout ice block. Y are the temperatures at the
                         same points at the next timestep
 
-        NOTE: As the iceblock advects downglacier and the domain's length
-              increases until reaching the specified maximum A will need
-              to be recalculated. 
+        .. note:
+            As the iceblock advects downglacier and the domain's length
+            increases until reaching the specified maximum A will need
+            to be recalculated. 
 
-        Returns:
+        Returns
+        -------
             A (np.ndarray): square matrix with coefficients to calculate
                             temperatures within the ice block 
         """
@@ -390,31 +421,38 @@ class Crevasse:
         tip plastic zone (i.e., area where plastic deformation occurs ahead
         of the crack's tip.).
 
-        NOTE: correction is only used for the tensile stress component of
-        K_I (mode 1)
+        .. note: 
+            correction is only used for the tensile stress component of K_I (mode 1)
 
-        Args:
-            crevasse_depth : depth below surface in meters
-            ice_thickness : in meters
-            use_approximation (bool): defaults to False
-                if True return 1.12 instead of the polynomial expansion
+        Parameters
+        ----------
+        crevasse_depth: float, int
+            depth below surface in meters
+        ice_thickness: float, int
+            ice thickness in meters
+        use_approximation: bool
+            whether to use shallow crevasse approximation.
+            if True return 1.12 instead of the polynomial expansion.
+            Defaults to False
 
-        Returns:
-            F(lambda) float : stress intensity correction factor
-
-
-            """
+        Returns
+        -------
+            F(lambda): float
+                stress intensity correction factor
+        """
         p = P([1.12, -0.23, 10.55, -21.72, 30.39])
         return 1.12 if use_approximation else p(self.depth / self.ice_thickness)
 
     def tensile_stress(self):
-        """
+        """calculate tensile stress
 
-        <Note: an approximatioin of the polynomial coefficient can be used
-        if the ratio between crevasse_depth and ice thickness is less than
-        0.2. Future work could add an if statement, but should test if the
-        full computation with numpy.polynomial.Polynomial is faster than the
-        conditional.>
+        .. note: 
+        
+            an approximatioin of the polynomial coefficient can be used
+            if the ratio between crevasse_depth and ice thickness is less than
+            0.2. Future work could add an if statement, but should test if the
+            full computation with numpy.polynomial.Polynomial is faster than the
+            conditional.
 
         Equation from van der Veen 1998
         stress intensity factor K_I(1) = F(lambda)*Rxx*sqrt(pi*crevasse_depth)
@@ -425,13 +463,14 @@ class Crevasse:
         For shallow crevasses
             F(lambda->0) = 1.12 * Rxx * sqrt(pi*crevasse_depth)
 
-        Args:
+        
             Rxx (): far-field stress or tensile resistive stress
             crevasse_depth (float): crevasse depth below ice surface in m
             ice_thickness (float): ice thickness in meters
 
-        Returns:
-            stress intensity factor's tensile component
+        Returns
+        -------
+        stress intensity factor's tensile component
         """
         return self.F(self.depth, self.ice_thickness
                       ) * self.Rxx * sqrt(pi * self.depth)
@@ -456,28 +495,35 @@ class Crevasse:
                         + 0.683 * ice_density * g * ice_thickness**1.5)
                         / 0.683 * water_density * g )**2/3
 
-        Assumptions:
-            - Rxx is constant with depth - not accounting for firn
-        Note:
+        Assumptions
+        -----------
+        Rxx is constant with depth - not accounting for firn
+        
+        .. note:
+        
             using the function `tensile_stress()` will calculate the full
             tensile stress term instead of using the approximation of 1.12
             shown in equations 2 and 3. An if statement can be added,
             however, numpy's polynomial function is quite fast.
 
-        Args:
-            Rxx ([type]): far field tensile stress
-            crevasse_depth (float): crevasse depth below ice surface (m)
-            fracture_toughness (float): fracture toughness of ice
-                units of MPa*m^1/2
-            ice_thickness (float): ice thickness in meters
-            ice_density (float, optional): [description].
-                        Defaults to DENSITY_ICE = 917 kg/m^3.
+        Parameters
+        ----------
+        Rxx:
+            far field tensile stress
+        crevasse_depth: float
+            crevasse depth below ice surface (m)
+        fracture_toughness: float
+            fracture toughness of ice units of MPa*m^1/2
+        ice_thickness: float): ice thickness in meters
+        ice_density: float, optional
+            Density of ice/firn.Defaults to DENSITY_ICE = 917 kg/m^3.
 
-        Returns:
-            water_height (float): water height above crevasse bottom (m)
-                values (0, crevasse_depth) -> boundaries rep a water-free
-                crevasse (=0) or a copletely full crevasse (=crevase_depth).
-
+        Returns
+        -------
+        water_height: float
+            water height above crevasse bottom (m)
+            values (0, crevasse_depth) -> boundaries rep a water-free
+            crevasse (=0) or a copletely full crevasse (=crevase_depth).
         """
         return (
             (
@@ -562,15 +608,19 @@ def diff_squares(x, y):
 def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
     """empirical density-depth relationship from Paterson 1994
 
-    Args:
-        depth (float/array): depth
-        C (float, optional): constant variable with site
-            0.0165 m^-1 < C < 0.0314 m^-1
-            defaults to 0.02 m^-1
-        ice_density (float, optional): [description]. Defaults to 917.
-        snow_density (float, optional): [description]. Defaults to 350.
+    Parameters
+    ----------
+    depth : float/array
+        depth
+    C : float, optional
+        constant variable with site. 0.0165 m^-1 < C < 0.0314 m^-1. Defaults to 0.02 m^-1
+    ice_density : (float, optional)
+        Defaults to 917.
+    snow_density : (float, optional):
+        Defaults to 350.
 
-    Returns:
+    Returns
+    -------
         snow density at depth
     """
     return ice_density - (ice_density - snow_density) * np.exp(-C*depth)

@@ -1,3 +1,7 @@
+# .readthedocs.yaml
+# Read the Docs configuration file
+
+# Required
 version: 2
 
 python:
@@ -13,3 +17,7 @@ build:
 
 sphinx:
   fail_on_warning: true
+
+formats:
+  - pdf
+  - epub
