@@ -7,7 +7,7 @@ setup(
       url="http://github.com/jzmejia/crevasse_propagation",
       author="Jessica Mejia",
       author_email="jzmejia@buffalo.edu",
-      install_requires=['numpy','scipy','pandas','math','typing','sys','os'],
+      install_requires=['numpy','scipy','pandas'],
       packages=['crevprop'],
       licence='MIT'
       )
