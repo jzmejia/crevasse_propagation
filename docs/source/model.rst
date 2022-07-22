@@ -15,7 +15,7 @@ Constructor
 
 Attributes and underlying data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-**Model Domain*
+**Model Domain**
 
 .. autosummary::
     :toctree:
