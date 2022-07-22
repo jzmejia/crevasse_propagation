@@ -27,7 +27,7 @@ class IceBlock():
     """
     Two-dimensional ice block geometry defining model domain.
     
-    Attributes
+    Parameters
     ----------
     ice_thickness : float, int
         thickness of ice block in meters
@@ -194,9 +194,7 @@ class ThermalModel(object):
         """Apply temperature advection and diffusion through ice block.
 
 
-
-
-        Note on `ThermalModel` geometry and relationship to `IceBlock`
+        Note on `ThermalModel` geometry and relationship to `IceBlock`:
 
         This class set's up the geometry of the thermal model which differs
         IceBlock. ThermalModel has a different horizontal (dx) and vertical (dz) 
@@ -326,9 +324,9 @@ class ThermalModel(object):
     def A_matrix(self):
         """create the A matrix to solve for future temperatures
 
-        [y] = [A]^-1[b] where A is the A matrix and b is current temperatures
-                        throughout ice block. Y are the temperatures at the
-                        same points at the next timestep
+        [y] = [A]^-1[b] where A is the A matrix and b is current 
+        temperatures throughout ice block. Y are the temperatures at the
+        same points at the next timestep
 
         .. note:
             As the iceblock advects downglacier and the domain's length
@@ -337,8 +335,9 @@ class ThermalModel(object):
 
         Returns
         -------
-            A (np.ndarray): square matrix with coefficients to calculate
-                            temperatures within the ice block 
+        A : np.ndarray
+            square matrix with coefficients to calculate temperatures 
+            within the ice block 
         """
         nx = self.x.size
         nz = self.z.size
@@ -495,8 +494,7 @@ class Crevasse:
                         + 0.683 * ice_density * g * ice_thickness**1.5)
                         / 0.683 * water_density * g )**2/3
 
-        Assumptions
-        -----------
+        Assumptions:
         Rxx is constant with depth - not accounting for firn
         
         .. note:
@@ -626,32 +624,24 @@ def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
     return ice_density - (ice_density - snow_density) * np.exp(-C*depth)
 
 
-"""
-fracture.py
 
 
 
-
-Model Geometry
-
-  + → x
-  ↓ 
-  z                
+# Model Geometry
+#   + → x
+#   ↓ 
+#   z                
                  
-‾‾‾‾⎡‾‾‾‾\                /‾‾‾‾‾‾‾‾‾         ⎤
-    ⎜     \              /                   ⎟
-    ⎜      \<-- D(z) -->/                    ⎟
-    ⎜       \          /                     ⎟
-    d        \--------/  <--- water surface  ⎦
-    ⎜         \wwwwww/
-    ⎜          \wwww/
-    ⎜           \ww/
-    ⎣  crevasse  \/
-        depth
-
-
-"""
-
+# ‾‾‾‾⎡‾‾‾‾\                /‾‾‾‾‾‾‾‾‾         ⎤
+#     ⎜     \              /                   ⎟
+#     ⎜      \<-- D(z) -->/                    ⎟
+#     ⎜       \          /                     ⎟
+#     d        \--------/  <--- water surface  ⎦
+#     ⎜         \wwwwww/
+#     ⎜          \wwww/
+#     ⎜           \ww/
+#     ⎣  crevasse  \/
+#         depth
 
 # STRESS INTENSITY FACTOR
 # For a fracture to propagate

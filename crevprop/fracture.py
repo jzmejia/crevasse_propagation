@@ -111,9 +111,8 @@ def water_height(
                       + 0.683 * ice_density * g * ice_thickness**1.5)
                       / 0.683 * water_density * g )**2/3
 
-    Assumptions
-    -----------
-        Rxx is constant with depth - not accounting for firn
+    
+    Rxx is constant with depth - not accounting for firn
         
     .. note:
     
@@ -122,19 +121,23 @@ def water_height(
         shown in equations 2 and 3. An if statement can be added,
         however, numpy's polynomial function is quite fast.
 
-    Arguements
+    Parameters
     ----------
-    Rxx ([type]): far field tensile stress
-    crevasse_depth (float): crevasse depth below ice surface (m)
-    fracture_toughness (float): fracture toughness of ice
-        units of MPa*m^1/2
-    ice_thickness (float): ice thickness in meters
-    ice_density (float, optional): [description].
-                Defaults to DENSITY_ICE = 917 kg/m^3.
+    Rxx : 
+        far field tensile stress
+    crevasse_depth : float
+        crevasse depth below ice surface (m)
+    fracture_toughness : float
+        fracture toughness of ice in units of MPa*m^1/2
+    ice_thickness : float
+        ice thickness in meters
+    ice_density : float
+        Defaults to DENSITY_ICE = 917 kg/m^3.
 
     Returns
     -------
-    water_height (float): water height above crevasse bottom (m)
+    water_height : float 
+        water height above crevasse bottom (m)
         values (0, crevasse_depth) -> boundaries rep a water-free
         crevasse (=0) or a copletely full crevasse (=crevase_depth).
     """
@@ -154,15 +157,25 @@ def water_depth(Rxx,
                 fracture_toughness=FRACTURE_TOUGHNESS,
                 ice_density=DENSITY_ICE
                 ):
+    """Calculate water depth within crevasse"""
     return crevasse_depth - water_height(Rxx, fracture_toughness,
                                          crevasse_depth, ice_thickness, ice_density)
 
 
 
 
-def sigma(
-    sigma_T, crevasse_depth, water_depth,
-):
+def sigma(sigma_T, crevasse_depth, water_depth):
+    """Calculate sigma
+    
+    Parameters
+    ----------
+    sigma_T : float, int
+    crevasse_depth : float, int
+        crevasse depth from ice surface (m), positive.
+    water_depth : float, int
+        depth from ice surface to water surface within crevasse (m), positive.
+    
+    """
     return (
         sigma_T
         - (2 * DENSITY_ICE * g * crevasse_depth) / pi
@@ -180,11 +193,11 @@ def applied_stress(traction_stress, crevasse_depth, water_depth, has_water=False
     Parameters
     ----------
     traction_stress
-    crevasse_depth: 
+    crevasse_depth : 
         crevasse depth in meters from ice surface
-    water_depth : (float, int)
+    water_depth : float, int
         distance from ice surface to water column within crevasse in meters.
-    has_water : (bool, optional)
+    has_water : bool, optional
         Is there water within the crevasse? Defaults to False.
 
     Returns
@@ -221,7 +234,7 @@ def elastic_displacement(z,
                          alpha=(1-POISSONS_RATIO),
                          has_water=True
                          ):
-    """_summary_
+    """calculate elastic displacement of crevasse walls due to applied stress sigma_T.
 
     Parameters
     ----------
@@ -264,25 +277,55 @@ def elastic_displacement(z,
 
 # math helper functions to simplify the
 def sum_over_diff(x, y):
+    """calcualte x+y / x-y
+    
+    Parameters
+    ----------
+    x : float, int
+    y : float, int
+    
+    Returns
+    -------
+        : float
+    """
     return (x+y) / (x-y)
 
 
 def diff_squares(x, y):
+    """Calculate the difference of squares
+    
+    Parameters
+    ----------
+    x : float, int
+    y : float, int
+        
+    Returns
+    -------
+        : float
+        square root of x^2 - y^2
+    
+    """
     return np.sqrt(x**2 - y**2)
 
 
 def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
     """empirical density-depth relationship from Paterson 1994
 
-    Args:
-        depth (float/array): depth
-        C (float, optional): constant variable with site
-            0.0165 m^-1 < C < 0.0314 m^-1
-            defaults to 0.02 m^-1
-        ice_density (float, optional): [description]. Defaults to 917.
-        snow_density (float, optional): [description]. Defaults to 350.
+    Parameters
+    ----------
+    depth : float, array
+        depth below ice surface in m
+    C : float, optional
+        constant variable with site. Use 0.0165 m^-1 < C < 0.0314 m^-1
+        Defaults to 0.02 m^-1
+    ice_density : float, optional
+        value to use for ice density in kg/m^3. Defaults to 917.
+    snow_density : float, optional
+        value to use for snow density (fresh). Defaults to 350.
 
-    Returns:
+    Returns
+    -------
+        : float, array 
         snow density at depth
     """
     return ice_density - (ice_density - snow_density) * np.exp(-C*depth)
