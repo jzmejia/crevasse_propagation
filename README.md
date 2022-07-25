@@ -1,4 +1,6 @@
-# crevasse_propagation
+# Crevasse Propagation Model
+[![Documentation Status](https://readthedocs.org/projects/crevasse-propagation/badge/?version=latest)](https://crevasse-propagation.readthedocs.io/en/latest/?badge=latest)
+
 
 
 ## Description
