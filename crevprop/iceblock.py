@@ -28,7 +28,7 @@ class IceBlock():
     """
     Two-dimensional ice block geometry defining model domain.
     
-    Attributes
+    Parameters
     ----------
     ice_thickness : float, int
         thickness of ice block in meters
@@ -180,8 +180,6 @@ class IceBlock():
     def _init_temperatures(self, T_profile, T_surface, T_bed):
         return ThermalModel(self.ice_thickness, self.length, self.dt_T,
                             self.dz, self.crev_locs, T_profile, T_surface, T_bed) if T_profile else None
-
-
 
 
 # class CrevasseField:
@@ -431,32 +429,24 @@ def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
     return ice_density - (ice_density - snow_density) * np.exp(-C*depth)
 
 
-"""
-fracture.py
 
 
 
-
-Model Geometry
-
-  + → x
-  ↓ 
-  z                
+# Model Geometry
+#   + → x
+#   ↓ 
+#   z                
                  
-‾‾‾‾⎡‾‾‾‾\                /‾‾‾‾‾‾‾‾‾         ⎤
-    ⎜     \              /                   ⎟
-    ⎜      \<-- D(z) -->/                    ⎟
-    ⎜       \          /                     ⎟
-    d        \--------/  <--- water surface  ⎦
-    ⎜         \wwwwww/
-    ⎜          \wwww/
-    ⎜           \ww/
-    ⎣  crevasse  \/
-        depth
-
-
-"""
-
+# ‾‾‾‾⎡‾‾‾‾\                /‾‾‾‾‾‾‾‾‾         ⎤
+#     ⎜     \              /                   ⎟
+#     ⎜      \<-- D(z) -->/                    ⎟
+#     ⎜       \          /                     ⎟
+#     d        \--------/  <--- water surface  ⎦
+#     ⎜         \wwwwww/
+#     ⎜          \wwww/
+#     ⎜           \ww/
+#     ⎣  crevasse  \/
+#         depth
 
 # STRESS INTENSITY FACTOR
 # For a fracture to propagate

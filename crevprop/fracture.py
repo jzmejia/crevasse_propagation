@@ -112,7 +112,9 @@ def water_height(
                       + 0.683 * ice_density * g * ice_thickness**1.5)
                       / 0.683 * water_density * g )**2/3
 
+
     **Assumptions**: Rxx is constant with depth and doesn't account fors firn
+
         
     Note
     ----
@@ -136,7 +138,7 @@ def water_height(
 
     Returns
     -------
-    water_height : float
+    water_height : float 
         water height above crevasse bottom (m)
         values (0, crevasse_depth) -> boundaries rep a water-free
         crevasse (=0) or a copletely full crevasse (=crevase_depth).
@@ -181,9 +183,18 @@ def water_depth(Rxx,
 
 
 
-def sigma(
-    sigma_T, crevasse_depth, water_depth,
-):
+def sigma(sigma_T, crevasse_depth, water_depth):
+    """Calculate sigma
+    
+    Parameters
+    ----------
+    sigma_T : float, int
+    crevasse_depth : float, int
+        crevasse depth from ice surface (m), positive.
+    water_depth : float, int
+        depth from ice surface to water surface within crevasse (m), positive.
+    
+    """
     return (
         sigma_T
         - (2 * DENSITY_ICE * g * crevasse_depth) / pi
@@ -201,7 +212,7 @@ def applied_stress(traction_stress, crevasse_depth, water_depth, has_water=False
     Parameters
     ----------
     traction_stress
-    crevasse_depth: 
+    crevasse_depth : 
         crevasse depth in meters from ice surface
     water_depth : float, int
         distance from ice surface to water column within crevasse in meters.
@@ -242,7 +253,8 @@ def elastic_displacement(z,
                          alpha=(1-POISSONS_RATIO),
                          has_water=True
                          ):
-    """calculate elastic deplacement across crevasse walls
+    """calculate elastic displacement of crevasse walls due to applied stress sigma_T.
+
 
     Parameters
     ----------
@@ -286,7 +298,17 @@ def elastic_displacement(z,
 
 # math helper functions to simplify the
 def sum_over_diff(x, y):
-    """calculate the sum of two numbers divided by the difference of them"""
+    """calcualte x+y / x-y
+    
+    Parameters
+    ----------
+    x : float, int
+    y : float, int
+    
+    Returns
+    -------
+    : float
+    """
     return (x+y) / (x-y)
 
 
@@ -299,8 +321,7 @@ def diff_squares(x, y):
     
     Returns
     -------
-    float
-    
+    : float
     """
     return np.sqrt(x**2 - y**2)
 
@@ -310,19 +331,19 @@ def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
 
     Parameters
     ----------
-    depth : float, np.array
-        depth in meters
+    depth : float, array
+        depth below ice surface in m
     C : float, optional
-        constant variable with site
-        0.0165 m^-1 < C < 0.0314 m^-1. Defaults to 0.02 m^-1
+        constant variable with site. Use 0.0165 m^-1 < C < 0.0314 m^-1
+        Defaults to 0.02 m^-1
     ice_density : float, optional
-        ice density in kg/m^3. Defaults to 917.
+        value to use for ice density in kg/m^3. Defaults to 917.
     snow_density : float, optional
-        snow density in kg/m^3. Defaults to 350.
+        value to use for snow density (fresh). Defaults to 350.
 
     Returns
     -------
-    float
+    : float, array 
         snow density at depth
     """
     return ice_density - (ice_density - snow_density) * np.exp(-C*depth)
