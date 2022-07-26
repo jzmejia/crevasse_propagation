@@ -16,12 +16,263 @@ domain downstream. Once the model's horzontal domain exceeds a
 length of 500 m, we remove the uppermost 200 m of domain. This model configuration allows the model's domain to track the
 crevasse field as it advects downglacier and evolvs thermo-mechanically
 
-Thermal model components include
+Thermal model components include:
 - horizontal diffusion
 - vertical diffusion
 - latent heat transfer from refreezing
+
 """
+import pandas as pd
 import numpy as np
+from typing import Union, Tuple
+
+from .physical_constants import DENSITY_ICE
+from . import physical_constants as pc
+
+
+class ThermalModel():
+    """Thermal model used to create IceBlock's temperature field.
+    
+    Note
+    ----
+    on ``ThermalModel`` geometry and relationship to ``IceBlock``
+    This class set's up the geometry of the thermal model which differs
+    IceBlock. ThermalModel has a different horizontal ``dx`` and vertical ``dz)``
+    resolution within the 2D model domain of the IceBlock, whereby dx
+    becomes a function of ice properties and model timestep, representing
+    the horizontal distance of thermal diffusion within the ice during the 
+    thermal model's timestep. ``dz`` (vertical or depth) spacing can differ from
+    ``IceBlock``, as the thermal model will run with a corser vertical resolution
+    to save on computational expense. 
+
+        
+    Attributes
+    ----------
+    dt : int, float
+        thermal model timestep in seconds
+    diffusive_lengthscale: float
+    length : float
+    ice_thickness
+    dx : float, int
+        x-coordinate spacing in meters
+    dz : float, int
+        z-coordinate (depth) spacing in meters
+    z : np.array
+        z-coordinate (depth) array of model coordinates
+    x : np.array
+        x-coordinates of model domain, from 0 at down-stream end 
+        of ice block, to -L at up-stream end. 
+    crevasses 
+        crevasse coorindates within model domain
+    T_surface : int, float
+        Temperature at ice surface in deg C.
+    T_bed : int, float
+        Basal boundary condition used for thermal model, temperature in deg C.
+        Defaults to 0 deg C
+    T_upglacier : np.array
+        Temperature profile to use for upstream boundary condition of thermal model
+        requries temperatures in deg C with depth from ice surface
+    T : np.ndarray
+        Temperature array at resolution of dx, dz thorughout iceblock in deg C
+    Tdf : pd.DataFrame
+        Dataframe representation of Temperatures thoughout iceblock
+        cols = x,coords, index = z,depth coords, values correspond to
+        ice temperature in deg C.
+    T_crev : float, int
+        Temperature at crevasse walls in deg C.
+    solver : str
+        type of solver to use, defaults to ``explicit``
+
+    """
+    def __init__(
+        self,
+        ice_thickness: Union[int, float],
+        length: Union[int, float],
+        dt_T: Union[int, float],
+        dz: Union[int, float],
+        crevasses,
+        T_profile,
+        T_surface=None,
+        T_bed=None,
+        solver=None
+    ):
+        """Apply temperature advection and diffusion through ice block.
+
+        Parameters
+        ----------
+        ice_thickness : int, float
+            ice thickness in meters.
+        length : int, float
+            Length of model domain in the x-direction (m).
+        dt_T : int, float
+            thermal model timestep in seconds.
+        dz : int, float:
+            vertical resolution for domain (m). Value is set to 5 m if 
+            input value is below 5 to reduce computational load. 
+        T_profile : pd.Series, pd.DataFrame, np.Array
+            Temperatures within ice column to set upstream boundary 
+            condition within ice block. Temperatures in deg C with 
+            corresponding depth from ice surface (m). 
+        T_surface : float, int
+            Air temperature in deg C. Defaults to 0.
+        T_bed : float, int
+            Temperature at ice-bed interface in deg C. Defaults to None.
+        """
+
+        # geometry
+        self.length = length
+        self.ice_thickness = ice_thickness
+        self.dt = dt_T
+        self.diffusive_lengthscale = self._diffusion_lengthscale()
+        self.dx = (0.5*self.length) / round(0.5*self.length /
+                                            self.diffusive_lengthscale)
+        self.dz = dz if self._ge(dz, 5) else 5
+        self.z = np.arange(-self.ice_thickness, self.dz, self.dz) if isinstance(
+            self.dz, int) else self._toarray(-self.ice_thickness, self.dz, self.dz)
+        self.x = self._toarray(-self.dx-self.length, 0, self.dx)
+
+        self.crevasses = crevasses
+
+        # Boundary Conditions
+        self.T_surface = T_surface if T_surface else 0
+        self.T_bed = T_bed if T_bed else 0
+        self.T_upglacier = self._set_upstream_bc(T_profile)
+        # left = upglacier end, right = downglacier
+        self.T = np.outer(self.T_upglacier, np.linspace(1, 0.99, self.x.size))
+
+        # initialize temperatures used for leap-frog advection
+        self.T0 = None
+        self.Tnm1 = None
+        self.Tdf = pd.DataFrame(
+            data=self.T, index=self.z, columns=np.round(self.x))
+        self.T_crev = 0
+
+        self.solver = solver if solver else "explicit"
+        # self.crev_locs = 0
+
+    def _diffusion_lengthscale(self):
+        return np.sqrt(1.090952729e-6 * self.dt)
+
+    def _ge(self, n, thresh):
+        return True if n >= thresh else False
+
+    def _toarray(self, start, stop, step):
+        return np.arange(start, stop, step)
+
+    def _set_upstream_bc(self, Tprofile):
+        """interpolate temperature profile data points to match z res.
+
+        Parameters
+        ----------
+        Tprofile : [Tuple(array, array), pd.DataFrame]
+            Temperature profile data points. temperature, elevation = Tuple
+            your array must be structured such that 
+
+        Returns
+        -------
+        np.array
+            Ice temperatures for entire ice block in deg C.
+        """
+        # interpolate temperature profile to match z (vertical resolution.)
+        if isinstance(Tprofile, pd.DataFrame):
+            t, z = (1, 0) if Tprofile[Tprofile.columns[0]
+                                      ].is_monotonic else (0, 1)
+            t = Tprofile[Tprofile.columns[t]].values
+            z = Tprofile[Tprofile.columns[z]].values
+        elif isinstance(Tprofile, Tuple):
+            t, z = Tprofile
+
+        T = np.interp(self.z, z, t)
+
+        # smooth temperature profile with a 25 m window
+        win = self.dz*25+2
+        T = pd.Series(T[:win]).append(pd.Series(T).rolling(
+            win, min_periods=1, center=True).mean()[win:])
+
+        # apply basal temperature condition
+        idx = 0 if z[0] < -1 else -1
+        T[idx] = self.T_bed
+
+        return T.values
+
+    def t_resample(self, dz):
+        """resample temperatures to match z resolution"""
+        if dz % self.dz == 0:
+            T = self.Tdf[self.Tdf.index.isin(self.z[::dz].tolist())].values
+        # ToDo add else statement/another if statement
+        return T
+
+    # def _calc_thermal_diffusivity(self):
+
+    #     return
+
+    def A_matrix(self):
+        """create the A matrix to solve for future temperatures
+
+        **A** is used to solve for future temperatures within iceblock following::
+        
+            [y] = [A]^-1[b] 
+            
+            where A is the A matrix and b is current temperatures
+            throughout ice block. Y are the temperatures at the
+            same points at the next timestep
+
+        Note
+        ----
+        As the iceblock advects downglacier and the domain's length
+        increases until reaching the specified maximum A will need
+        to be recalculated. 
+
+        Returns
+        -------
+        A : np.ndarray
+            square matrix with coefficients to calculate temperatures within the ice block 
+        """
+        nx = self.x.size
+        nz = self.z.size
+
+        sx = pc.THERMAL_DIFFUSIVITY * self.dt / self.dx ** 2
+        sz = pc.THERMAL_DIFFUSIVITY * self.dt / self.dz ** 2
+
+        # Apply crevasse location boundary conditions to A
+        # by creating a list of matrix indicies that shouldn't be assigned
+        crev_idx = []
+        for crev in self.crevasses:
+            # surface coordinate already covered by surface boundary condition
+            # use to find depth values
+            crev_x = (nx * nz - 1) - abs(round(crev[0]/self.dx))
+            crev_depth = crev[1]
+            if crev_depth >= 2*self.dz and crev_depth < self.ice_thickness:
+                crev_idx.extend(
+                    np.arange(crev_x-(np.floor(crev_depth/self.dz)-1)*nx, crev_x, nx))
+
+        # create inversion matrix A
+        A = np.eye(self.T.size)
+
+        for i in range(nx, self.T.size - nx):
+            if i % nx != 0 and i % nx != nx-1 and i not in crev_idx:
+                A[i, i] = 1 + 2*sx + 2*sz
+                A[i, i-nx] = A[i, i+nx] = -sz
+                A[i, i+1] = A[i, i-1] = -sx
+
+        return A
+
+    def _solve_for_T(self):
+        """Solve for future temp w/ implicit finite difference scheme
+
+        Solve for future temperatures while storing temperature fields for
+        the the previous two timesteps 
+        """
+        A = self.A_matrix()
+
+        pass
+
+    def refreezing(self):
+        bluelayer = self.dt * pc.THERMAL_CONDUCTIVITY_ICE / \
+            (pc.LATIENT_HEAT_OF_FUSION * DENSITY_ICE) * ()
+        pass
+
+
 
 
 class PureIce:
