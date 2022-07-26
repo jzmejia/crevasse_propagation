@@ -6,7 +6,8 @@ IceBlock
 .. currentmodule:: crevprop
 
 Constructor
-~~~~~~~~~~~
+-----------
+
 .. autosummary::
     :toctree: generate
 
@@ -14,11 +15,11 @@ Constructor
 
 
 Attributes and underlying data
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-**Model Domain*
+------------------------------
+
+**Model Domain**
 
 .. autosummary::
-    :toctree:
 
     :py:meth:`crevprop.iceblock.IceBlock.ice_thickness`
     

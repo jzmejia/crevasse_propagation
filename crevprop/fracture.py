@@ -21,26 +21,28 @@ def F(crevasse_depth, ice_thickness, use_approximation=False):
     """Finite ice thickness correction for the stress intensity factor
 
     from van der Veen (1998) equation 6
-    F(lambda) where lambda = crevasse depth / ice thickness
+    
+     F(:math:`\lambda`) where :math:`\lambda` = crevasse_depth / ice_thickness
 
     correction accounts for the ~12% increase in the stress intensity
-    factor that accounts for material properties such aas the crack
+    factor that accounts for material properties such as the crack
     tip plastic zone (i.e., area where plastic deformation occurs ahead
     of the crack's tip.).
 
-    .. note:
-        correction is only used for the tensile stress component of K_I (mode 1)
+    Note
+    ----
+    correction is only used for the tensile stress component of K_I (mode 1)
 
     Parameters
     ----------
-    crevasse_depth : 
+    crevasse_depth : float, int
         depth below surface in meters
-    ice_thickness : 
+    ice_thickness : float, int
         ice thickness in meters
     use_approximation: bool
         whether to use the shallow crevasse approximation. 
-        If `True` use 1.12 instead of the polynomial expansion, if `False`
-        use full polynomial expansion in calculation. Defaults to False.
+        If ``True`` use 1.12 instead of the polynomial expansion, if ``False``
+        use full polynomial expansion in calculation. Defaults to ``False``.
 
     Returns
     -------
@@ -53,28 +55,28 @@ def F(crevasse_depth, ice_thickness, use_approximation=False):
 def tensile_stress(Rxx, crevasse_depth, ice_thickness):
     """Calculate the stress intensity factor's tensile compoent.
 
-    .. note:
-        an approximatioin of the polynomial coefficient can be 
-        used if the ratio between crevasse_depth and ice thickness 
-        is less than 0.2. Future work could add an if statement, 
-        but should test if the full computation with 
-        numpy.polynomial.Polynomial is faster than the conditional.
+    An approximatioin of the polynomial coefficient can be 
+    used if the ratio between ``crevasse_depth`` and ``ice_thickness``
+    is less than 0.2. Future work could add an if-statement, 
+    but should test if the full computation with 
+    ``numpy.polynomial.Polynomial`` is faster than the conditional.
 
-    Equation from van der Veen 1998
-    stress intensity factor K_I(1) = F(lambda)*Rxx*sqrt(pi*crevasse_depth)
-    where lambda = crevasse_depth / ice_thickness and
-    F(lambda) =    1.12 - 0.23*lambda + 10.55*lambda**2
-                - 12.72*lambda**3 + 30.39*lambda**4
+    van der Veen (1998)'s formulation of the stress intensity factor for mode I crack opening (:math:`K_I`):
+    
+    .. math:: K_{I}(1) = F(\lambda) R_{xx}  \sqrt{\pi d}
+    
+    where :math:`\lambda = d/H` where *d* is crevasse depth, *H* is ice thickness, and 
+    
+    .. math:: F(\lambda) = 1.12 - 0.23\lambda + 10.55\lambda^2 - 12.72\lambda^3 + 30.39\lambda^4
 
-    For shallow crevasses
-        F(lambda->0) = 1.12 * Rxx * sqrt(pi*crevasse_depth)
+    For shallow crevasses, :math:`F(\lambda \Rightarrow 0) = 1.12  R_{xx}  \sqrt{\pi d}`
 
     Parameters
     ----------
     Rxx: 
         far-field stress or tensile resistive stress
     crevasse_depth: float
-        crevasse depth below ice surface in m
+        crevasse depth below ice surface in meters
     ice_thickness: float
         ice thickness in meters
 
@@ -95,43 +97,43 @@ def water_height(
     """calc water high in crevasse using van der Veen 2007
 
     van der Veen 1998/2007 equation to estimate the net stress intensity
-    factor (KI) for mode I crack opening where
+    factor (KI) for mode I crack opening where::
 
-    KI = tensile stress - lithostatic stress + water pressure        (1)
-    KI = 1.12 * Rxx * sqrt(pi * ice_thickness)                       (2)
-         - 0.683 * ice_density * g * ice_thickness**1.5
-         + 0.683 * water_density * g * water_height**1.5
+        KI = tensile stress - lithostatic stress + water pressure        (1)
+        KI = 1.12 * Rxx * sqrt(pi * ice_thickness)                       (2)
+            - 0.683 * ice_density * g * ice_thickness**1.5
+            + 0.683 * water_density * g * water_height**1.5
+    
+    because KI = KIC (the ``fracture_toughness`` of ice) when a crack
+    opens, we set KI=KIC in equation 2 and solve for water_height::
 
-
-    because KI = KIC (the `fracture_toughness` of ice) when a crack
-    opens, we set KI=KIC in equation 2 and solve for water_height:
-
-    water_height = (( KIC                                            (3)
+        water_height = (( KIC                                            (3)
                       - 1.12 * Rxx * sqrt(pi * ice_thickness)
                       + 0.683 * ice_density * g * ice_thickness**1.5)
                       / 0.683 * water_density * g )**2/3
 
-    
-    Rxx is constant with depth - not accounting for firn
+
+    **Assumptions**: Rxx is constant with depth and doesn't account fors firn
+
         
-    .. note:
-    
-        using the function `tensile_stress()` will calculate the full
-        tensile stress term instead of using the approximation of 1.12
-        shown in equations 2 and 3. An if statement can be added,
-        however, numpy's polynomial function is quite fast.
+    Note
+    ----
+    using the function ``tensile_stress()`` will calculate the full
+    tensile stress term instead of using the approximation of 1.12
+    shown in equations 2 and 3. An if statement can be added,
+    however, numpy's polynomial function is quite fast.
 
     Parameters
     ----------
-    Rxx : 
-        far field tensile stress
+    Rxx : float
+        Far field tensile stress
     crevasse_depth : float
         crevasse depth below ice surface (m)
     fracture_toughness : float
-        fracture toughness of ice in units of MPa*m^1/2
+        fracture toughness of ice, units of MPa*m^1/2
     ice_thickness : float
         ice thickness in meters
-    ice_density : float
+    ice_density : float, optional
         Defaults to DENSITY_ICE = 917 kg/m^3.
 
     Returns
@@ -157,7 +159,24 @@ def water_depth(Rxx,
                 fracture_toughness=FRACTURE_TOUGHNESS,
                 ice_density=DENSITY_ICE
                 ):
-    """Calculate water depth within crevasse"""
+    """Convert water height in crevasse to depth below surface in meters.
+    
+    Parameters
+    ----------
+    Rxx
+    crevasse_depth : float, int
+        crevasse depth in meters below surface (positive)
+    ice_thickness: float, int
+        local ice thickness in metesr
+    fracture_toughness: float, int
+        fracture toughness of ice
+    ice_density : float
+        ice density in kg/m^3, defaults to 917 kg/m^3
+    
+    Retures
+    -------
+    : float
+    """
     return crevasse_depth - water_height(Rxx, fracture_toughness,
                                          crevasse_depth, ice_thickness, ice_density)
 
@@ -236,16 +255,18 @@ def elastic_displacement(z,
                          ):
     """calculate elastic displacement of crevasse walls due to applied stress sigma_T.
 
+
     Parameters
     ----------
-    z
+    z 
     sigma_T : 
-    mu : 
-    crevasse_depth : (float, int)
+    mu : float, int
+        ice softness
+    crevasse_depth : float, int
         distance between ice surface and crevasse tip in m (positive).
     water_depth : 
         distance between ice surface and water surface within crevasse (m).
-    alpha : (tuple, optional)
+    alpha : tuple, optional
         Defaults to (1-POISSONS_RATIO).
     has_water : bool, optional
         Is there water within the crevasse? Defaults to True.
@@ -286,24 +307,21 @@ def sum_over_diff(x, y):
     
     Returns
     -------
-        : float
+    : float
     """
     return (x+y) / (x-y)
 
 
 def diff_squares(x, y):
-    """Calculate the difference of squares
-    
+    """calculate the squareroot of the difference of squares
     Parameters
     ----------
     x : float, int
     y : float, int
-        
+    
     Returns
     -------
-        : float
-        square root of x^2 - y^2
-    
+    : float
     """
     return np.sqrt(x**2 - y**2)
 
@@ -325,7 +343,7 @@ def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
 
     Returns
     -------
-        : float, array 
+    : float, array 
         snow density at depth
     """
     return ice_density - (ice_density - snow_density) * np.exp(-C*depth)

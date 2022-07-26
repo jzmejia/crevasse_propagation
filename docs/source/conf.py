@@ -32,7 +32,8 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.doctest',
     'sphinx.ext.duration',
-    'numpydoc'
+    'sphinx.ext.napoleon',
+    'numpydoc',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -51,6 +52,21 @@ exclude_patterns = []
 #
 # html_theme = 'furo'
 html_theme = 'sphinx_material'
+html_theme_options = {
+    'nav_title' : 'crevProp',
+    'repo_url' : 'https://github.com/jzmejia/crevasse_propagation',
+    'repo_type' : 'github',
+    'repo_name' : 'crevasse_propagation',
+    'base_url' : 'https://crevasse-propagation.readthedocs.io/en/latest/',
+    'css_minify': True,
+    'html_minify': True
+}
+
+html_sidebars = {
+    "**": ["globaltoc.html"]
+}
+
+html_logo = './crack.png'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -63,3 +79,13 @@ epub_show_urls = 'footnote'
 
 
 add_module_names = False
+
+# autosummary settings
+autosummary_generate = True
+autosummary_generate_overwrite = True
+
+
+# Napoleon settings
+napoleon_google_docstring = False
+napoleon_use_admonition_for_notes = True
+

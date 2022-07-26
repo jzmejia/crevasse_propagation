@@ -19,6 +19,7 @@ from typing import (
     Union,
 )
 
+from .temperature_field import ThermalModel
 from .physical_constants import DENSITY_ICE, DENSITY_WATER, POISSONS_RATIO
 from . import physical_constants as pc
 
@@ -61,8 +62,11 @@ class IceBlock():
     ice_density : float, int
         ice density to use throughout ice block in units of kg/m^3.
         Defaults to value set in physical_constants.py (917 kg/m^3)
-    .. note: 
-        future versions aim to allow a density profile.
+    
+    
+    Note
+    ----
+    future versions aim to allow a density profile.
     """
     def __init__(
         self,
@@ -100,8 +104,8 @@ class IceBlock():
         T_profile : np.array, pd.Series, pd.DataFrame, optional
             Temperature profile for upstream boundary condition. The 
             profile will be interpolated to match the thermal model's 
-            vertical resolution. A value for T_profile is required to 
-            run ThermalModel.
+            vertical resolution. A value for ``T_profile`` is required to 
+            run ``ThermalModel``.
         T_surface : float, optional
             Ice surface temperature, degrees C. Defaults to 0.
         T_bed : float, int, optional
@@ -111,7 +115,7 @@ class IceBlock():
             Defaults to 100 (m/year).
         fracture_toughness : float
             value to use for fracture toughness of ice (kPa), defaults 
-            to value defined in physical_constants.py (0.1 kPa)
+            to value defined in ``physical_constants.py`` (0.1 kPa)
         ice_density : float, int
             ice density to use throughout ice block in units of kg/m^3.
             Defaults to value set in physical_constants.py (917 kg/m^3)
@@ -178,212 +182,6 @@ class IceBlock():
                             self.dz, self.crev_locs, T_profile, T_surface, T_bed) if T_profile else None
 
 
-class ThermalModel(object):
-    def __init__(
-        self,
-        ice_thickness: Union[int, float],
-        length: Union[int, float],
-        dt_T: Union[int, float],
-        dz: Union[int, float],
-        crevasses,
-        T_profile,
-        T_surface=None,
-        T_bed=None,
-        solver=None
-    ):
-        """Apply temperature advection and diffusion through ice block.
-
-
-        Note on `ThermalModel` geometry and relationship to `IceBlock`:
-
-        This class set's up the geometry of the thermal model which differs
-        IceBlock. ThermalModel has a different horizontal (dx) and vertical (dz) 
-        resolution within the 2D model domain of the IceBlock, whereby dx
-        becomes a function of ice properties and model timestep, representing
-        the horizontal distance of thermal diffusion within the ice during the 
-        thermal model's timestep. dz (vertical or depth) spacing can differ from
-        IceBlock, as the thermal model will run with a corser vertical resolution
-        to save on computational expense. 
-
-        Parameters
-        ----------
-        ice_thickness : int, float
-            ice thickness in meters.
-        length : int, float
-            Length of model domain in the x-direction (m).
-        dt_T : int, float
-            thermal model timestep in seconds.
-        dz : int, float:
-            vertical resolution for domain (m). Value is set to 5 m if 
-            input value is below 5 to reduce computational load. 
-        T_profile : pd.Series, pd.DataFrame, np.Array
-            Temperatures within ice column to set upstream boundary 
-            condition within ice block. Temperatures in deg C with 
-            corresponding depth from ice surface (m). 
-        T_surface : float, int
-            Air temperature in deg C. Defaults to 0.
-        T_bed : float, int
-            Temperature at ice-bed interface in deg C. Defaults to None.
-
-
-
-        Attributes
-        ----------
-        dt : int, float
-            thermal model timestep in seconds
-        diffusive_lengthscale: float
-
-        """
-
-        # geometry
-        self.length = length
-        self.ice_thickness = ice_thickness
-        self.dt = dt_T
-        self.diffusive_lengthscale = self._diffusion_lengthscale()
-        self.dx = (0.5*self.length) / round(0.5*self.length /
-                                            self.diffusive_lengthscale)
-        self.dz = dz if self._ge(dz, 5) else 5
-        self.z = np.arange(-self.ice_thickness, self.dz, self.dz) if isinstance(
-            self.dz, int) else self._toarray(-self.ice_thickness, self.dz, self.dz)
-        self.x = self._toarray(-self.dx-self.length, 0, self.dx)
-
-        self.crevasses = crevasses
-
-        # Boundary Conditions
-        self.T_surface = T_surface if T_surface else 0
-        self.T_bed = T_bed if T_bed else 0
-        self.T_upglacier = self._set_upstream_bc(T_profile)
-        # left = upglacier end, right = downglacier
-        self.T = np.outer(self.T_upglacier, np.linspace(1, 0.99, self.x.size))
-
-        # initialize temperatures used for leap-frog advection
-        self.T0 = None
-        self.Tnm1 = None
-        self.Tdf = pd.DataFrame(
-            data=self.T, index=self.z, columns=np.round(self.x))
-        self.T_crev = 0
-
-        self.solver = solver if solver else "explicit"
-        # self.crev_locs = 0
-
-    def _diffusion_lengthscale(self):
-        return np.sqrt(1.090952729e-6 * self.dt)
-
-    def _ge(self, n, thresh):
-        return True if n >= thresh else False
-
-    def _toarray(self, start, stop, step):
-        return np.arange(start, stop, step)
-
-    def _set_upstream_bc(self, Tprofile):
-        """interpolate temperature profile data points to match z res.
-
-        Parameters
-        ----------
-        Tprofile : [Tuple(array, array), pd.DataFrame]
-            Temperature profile data points. temperature, elevation = Tuple
-            your array must be structured such that 
-
-        Returns
-        -------
-        : np.array
-            Ice temperatures for entire ice block in deg C.
-        """
-        # interpolate temperature profile to match z (vertical resolution.)
-        if isinstance(Tprofile, pd.DataFrame):
-            t, z = (1, 0) if Tprofile[Tprofile.columns[0]
-                                      ].is_monotonic else (0, 1)
-            t = Tprofile[Tprofile.columns[t]].values
-            z = Tprofile[Tprofile.columns[z]].values
-        elif isinstance(Tprofile, Tuple):
-            t, z = Tprofile
-
-        T = np.interp(self.z, z, t)
-
-        # smooth temperature profile with a 25 m window
-        win = self.dz*25+2
-        T = pd.Series(T[:win]).append(pd.Series(T).rolling(
-            win, min_periods=1, center=True).mean()[win:])
-
-        # apply basal temperature condition
-        idx = 0 if z[0] < -1 else -1
-        T[idx] = self.T_bed
-
-        return T.values
-
-    def t_resample(self, dz):
-        if dz % self.dz == 0:
-            T = self.Tdf[self.Tdf.index.isin(self.z[::dz].tolist())].values
-        # ToDo add else statement/another if statement
-        return T
-
-    # def _calc_thermal_diffusivity(self):
-
-    #     return
-
-    def A_matrix(self):
-        """create the A matrix to solve for future temperatures
-
-        [y] = [A]^-1[b] where A is the A matrix and b is current 
-        temperatures throughout ice block. Y are the temperatures at the
-        same points at the next timestep
-
-        .. note:
-            As the iceblock advects downglacier and the domain's length
-            increases until reaching the specified maximum A will need
-            to be recalculated. 
-
-        Returns
-        -------
-        A : np.ndarray
-            square matrix with coefficients to calculate temperatures 
-            within the ice block 
-        """
-        nx = self.x.size
-        nz = self.z.size
-
-        sx = pc.THERMAL_DIFFUSIVITY * self.dt / self.dx ** 2
-        sz = pc.THERMAL_DIFFUSIVITY * self.dt / self.dz ** 2
-
-        # Apply crevasse location boundary conditions to A
-        # by creating a list of matrix indicies that shouldn't be assigned
-        crev_idx = []
-        for crev in self.crevasses:
-            # surface coordinate already covered by surface boundary condition
-            # use to find depth values
-            crev_x = (nx * nz - 1) - abs(round(crev[0]/self.dx))
-            crev_depth = crev[1]
-            if crev_depth >= 2*self.dz and crev_depth < self.ice_thickness:
-                crev_idx.extend(
-                    np.arange(crev_x-(np.floor(crev_depth/self.dz)-1)*nx, crev_x, nx))
-
-        # create inversion matrix A
-        A = np.eye(self.T.size)
-
-        for i in range(nx, self.T.size - nx):
-            if i % nx != 0 and i % nx != nx-1 and i not in crev_idx:
-                A[i, i] = 1 + 2*sx + 2*sz
-                A[i, i-nx] = A[i, i+nx] = -sz
-                A[i, i+1] = A[i, i-1] = -sx
-
-        return A
-
-    def _solve_for_T(self):
-        """Solve for future temp w/ implicit finite difference scheme
-
-        Solve for future temperatures while storing temperature fields for
-        the the previous two timesteps 
-        """
-        A = self.A_matrix()
-
-        pass
-
-    def refreezing(self):
-        bluelayer = self.dt * pc.THERMAL_CONDUCTIVITY_ICE / \
-            (pc.LATIENT_HEAT_OF_FUSION * DENSITY_ICE) * ()
-        pass
-
-
 # class CrevasseField:
 #     def __init__(self,
 #                  crev_spacing,
@@ -420,8 +218,9 @@ class Crevasse:
         tip plastic zone (i.e., area where plastic deformation occurs ahead
         of the crack's tip.).
 
-        .. note: 
-            correction is only used for the tensile stress component of K_I (mode 1)
+        Note
+        ----
+        correction is only used for the tensile stress component of K_I (mode 1)
 
         Parameters
         ----------
@@ -436,8 +235,8 @@ class Crevasse:
 
         Returns
         -------
-            F(lambda): float
-                stress intensity correction factor
+        F(lambda): float
+            stress intensity correction factor
         """
         p = P([1.12, -0.23, 10.55, -21.72, 30.39])
         return 1.12 if use_approximation else p(self.depth / self.ice_thickness)
@@ -445,31 +244,38 @@ class Crevasse:
     def tensile_stress(self):
         """calculate tensile stress
 
-        .. note: 
+        Note
+        ----
+        an approximatioin of the polynomial coefficient can be used
+        if the ratio between crevasse_depth and ice thickness is less than
+        0.2. Future work could add an if statement, but should test if the
+        full computation with numpy.polynomial.Polynomial is faster than the
+        conditional.
+
+        Equation from van der Veen 1998 where the stress intensity factor (K_I)::
+            
+            K_I(1) = F(lambda)*Rxx*sqrt(pi*crevasse_depth)
+            where lambda = crevasse_depth / ice_thickness and
+            
+            F(lambda) = 1.12 - 0.23*lambda + 10.55*lambda**2 - 12.72*lambda**3 + 30.39*lambda**4
+
+        For shallow crevasses::
         
-            an approximatioin of the polynomial coefficient can be used
-            if the ratio between crevasse_depth and ice thickness is less than
-            0.2. Future work could add an if statement, but should test if the
-            full computation with numpy.polynomial.Polynomial is faster than the
-            conditional.
-
-        Equation from van der Veen 1998
-        stress intensity factor K_I(1) = F(lambda)*Rxx*sqrt(pi*crevasse_depth)
-        where lambda = crevasse_depth / ice_thickness and
-        F(lambda) =    1.12 - 0.23*lambda + 10.55*lambda**2
-                    - 12.72*lambda**3 + 30.39*lambda**4
-
-        For shallow crevasses
             F(lambda->0) = 1.12 * Rxx * sqrt(pi*crevasse_depth)
 
         
-            Rxx (): far-field stress or tensile resistive stress
-            crevasse_depth (float): crevasse depth below ice surface in m
-            ice_thickness (float): ice thickness in meters
+        Parameters
+        ----------
+        Rxx : 
+            far-field stress or tensile resistive stress
+        crevasse_depth : float
+            crevasse depth below ice surface in m
+        ice_thickness : float
+            ice thickness in meters
 
         Returns
         -------
-        stress intensity factor's tensile component
+            stress intensity factor's tensile component
         """
         return self.F(self.depth, self.ice_thickness
                       ) * self.Rxx * sqrt(pi * self.depth)
@@ -478,31 +284,30 @@ class Crevasse:
         """calc water high in crevasse using van der Veen 2007
 
         van der Veen 1998/2007 equation to estimate the net stress intensity
-        factor (KI) for mode I crack opening where
+        factor (KI) for mode I crack opening where::
 
-        KI = tensile stress - lithostatic stress + water pressure        (1)
-        KI = 1.12 * Rxx * sqrt(pi * ice_thickness)                       (2)
+            KI = tensile stress - lithostatic stress + water pressure        (1)
+            KI = 1.12 * Rxx * sqrt(pi * ice_thickness)                       (2)
             - 0.683 * ice_density * g * ice_thickness**1.5
             + 0.683 * water_density * g * water_height**1.5
 
 
         because KI = KIC (the `fracture_toughness` of ice) when a crack
-        opens, we set KI=KIC in equation 2 and solve for water_height:
+        opens, we set KI=KIC in equation 2 and solve for water_height::
 
-        water_height = (( KIC                                            (3)
-                        - 1.12 * Rxx * sqrt(pi * ice_thickness)
-                        + 0.683 * ice_density * g * ice_thickness**1.5)
-                        / 0.683 * water_density * g )**2/3
+            water_height = (( KIC                                            (3)
+            - 1.12 * Rxx * sqrt(pi * ice_thickness)
+            + 0.683 * ice_density * g * ice_thickness**1.5)
+            / 0.683 * water_density * g )**2/3
 
-        Assumptions:
-        Rxx is constant with depth - not accounting for firn
+        **Assumptions**: Rxx is constant with depth - not accounting for firn
         
-        .. note:
-        
-            using the function `tensile_stress()` will calculate the full
-            tensile stress term instead of using the approximation of 1.12
-            shown in equations 2 and 3. An if statement can be added,
-            however, numpy's polynomial function is quite fast.
+        Note
+        ----
+        using the function `tensile_stress()` will calculate the full
+        tensile stress term instead of using the approximation of 1.12
+        shown in equations 2 and 3. An if statement can be added,
+        however, numpy's polynomial function is quite fast.
 
         Parameters
         ----------
