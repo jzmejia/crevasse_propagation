@@ -22,6 +22,9 @@ Check out the :doc:`usage` section for further information, including how to
 
    This project is under active development.
 
+
+For model background and formulation check out :doc:`overview`.
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
