@@ -5,9 +5,9 @@
 
 
 
-**********************
+
 CrevProp documentation
-**********************
+======================
 
 **Date**: |today| **Version**: |version|
 
@@ -18,26 +18,25 @@ programming language.
 Check out the :doc:`usage` section for further information, including how to
 :ref:`install <installation>` the project.
 
+To learn more about the formulation of the crevasse propagation model see :doc:`overview`.
+
 .. note::
 
    This project is under active development.
 
 
-For model background and formulation check out :doc:`overview`.
 
+Contents
+--------
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
+   overview
    usage
    api
-   model
-   modules
-
-
 
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`
