@@ -1,29 +1,14 @@
 .. _api:
 
-=============
-API reference
-=============
+
+API
+===
 
 This page gives an overview of all public crevprop 
 objects, functions, and methods. 
 
 
-.. currentmodule:: crevprop
-
-.. toctree::
-    crevprop
-
-
-
-
-
-
-
 .. autosummary::
-    :toctree:
+    :toctree: api/
 
     crevprop.iceblock
-    crevprop.temperature_field
-    crevprop.fracture
-
-
