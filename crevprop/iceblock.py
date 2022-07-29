@@ -28,7 +28,7 @@ class IceBlock():
     """
     Two-dimensional ice block geometry defining model domain.
     
-    Parameters
+    Attributes
     ----------
     ice_thickness : float, int
         thickness of ice block in meters
@@ -36,23 +36,37 @@ class IceBlock():
         horizontal (x-coordinate) sampling within ice block (m)
     dz : float, int
         vertical sampling resolution within ice block (m)
+    x : np.array
+        x-coordinates of model domain ranging from 0 at downstream boundary
+        to -length at upstream boundary, with spacing of dx. Unit of meters.
+        This array defines the x coordinates of the iceblock overwhich
+        to run the model. 
+    z : np.array
+        z-coordinates (verical) of model domain ranging from 0 at the ice
+        surface to the ice thickness at the base of the ice sheet, spacing 
+        of dz. Unit of meters. This array defines the z coordinates of the
+        iceblock overwhich to run the crevasse propagation model. Note that
+        the thermal model will run with a minimum vertical resolution of 5m
+        to reduce computational costs (dz>=5m for thermal model). 
+    length : int, float
+        length of horizontal component of model domain in meters. 
     dt : float, int
-        Timestep in days to run crevasse model (days)
+        Timestep in seconds to run crevasse model (seconds)
+    dt_T : float, int
+        timestep in seconds to run thermal model (seconds)
     crev_spacing : float, int
         Spacing between crevasses in crevasse field (m)
-    thermal_freq : float, int
-        Multiple of timestep to run thermal model. 1 would run the 
-        thermal model at every timestep whereas a value of 10 would 
-        run the model after every 10 timesteps. Defaults to 10.
-    T_profile : np.array, pd.Series, pd.DataFrame, optional
-        Temperature profile for upstream boundary condition. The 
-        profile will be interpolated to match the thermal model's 
-        vertical resolution. A value for T_profile is required to 
-        run ThermalModel.
-    T_surface : float, optional
-        Ice surface temperature, degrees C. Defaults to 0.
-    T_bed : float, int, optional
-        Temperature boundary condition at Defaults to None.
+    crev_count : int
+        Number of crevasses within model domain
+    crev_locs : List[Tuple]
+        positional information corresponding to crevasses within crevasse field. 
+        Tuple entries contain the (x-coordinate, depth) of a crevasse, with the
+        number of list entries equal to the current crevasse count. These values 
+        are used by the ``ThermalModel`` when solving for ice temperature and 
+        refreezing. 
+    temperature : ThermalModel
+        an instance of ThermalModel populated with model geometry and 
+        initial conditions specified when calling ``__init__``
     u_surf : float, optional
         Ice surface velocity within domain (meters per year).
         Defaults to 100 (m/year).
@@ -62,6 +76,7 @@ class IceBlock():
     ice_density : float, int
         ice density to use throughout ice block in units of kg/m^3.
         Defaults to value set in physical_constants.py (917 kg/m^3)
+    
     
     
     Note
