@@ -66,7 +66,7 @@ html_sidebars = {
     "**": ["globaltoc.html"]
 }
 
-html_logo = './crack.png'
+html_logo = './_static/crack.png'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -78,11 +78,11 @@ html_logo = './crack.png'
 epub_show_urls = 'footnote'
 
 
-add_module_names = False
+# add_module_names = False
+
 
 # autosummary settings
 autosummary_generate = True
-autosummary_generate_overwrite = True
 
 
 # Napoleon settings
