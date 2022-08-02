@@ -29,10 +29,11 @@ def F(crevasse_depth, ice_thickness, use_approximation=False):
     tip plastic zone (i.e., area where plastic deformation occurs ahead
     of the crack's tip.).
 
-    Note
-    ----
+    Notes
+    -----
     correction is only used for the tensile stress component of K_I (mode 1)
-
+    
+    
     Parameters
     ----------
     crevasse_depth : float, int
@@ -43,10 +44,12 @@ def F(crevasse_depth, ice_thickness, use_approximation=False):
         whether to use the shallow crevasse approximation. 
         If ``True`` use 1.12 instead of the polynomial expansion, if ``False``
         use full polynomial expansion in calculation. Defaults to ``False``.
-
+        
+        
     Returns
     -------
     F(lambda) float : stress intensity correction factor
+    
     """
     p = P([1.12, -0.23, 10.55, -21.72, 30.39])
     return 1.12 if use_approximation else p(crevasse_depth / ice_thickness)
@@ -83,6 +86,7 @@ def tensile_stress(Rxx, crevasse_depth, ice_thickness):
     Returns
     -------
     stress intensity factor's tensile component
+    
     """
     return F(crevasse_depth, ice_thickness) * Rxx * sqrt(pi * crevasse_depth)
 
@@ -116,13 +120,14 @@ def water_height(
     **Assumptions**: Rxx is constant with depth and doesn't account fors firn
 
         
-    Note
-    ----
+    Notes
+    -----
     using the function ``tensile_stress()`` will calculate the full
     tensile stress term instead of using the approximation of 1.12
     shown in equations 2 and 3. An if statement can be added,
     however, numpy's polynomial function is quite fast.
-
+    
+    
     Parameters
     ----------
     Rxx : float
@@ -135,13 +140,15 @@ def water_height(
         ice thickness in meters
     ice_density : float, optional
         Defaults to DENSITY_ICE = 917 kg/m^3.
-
+        
+        
     Returns
     -------
     water_height : float 
         water height above crevasse bottom (m)
         values (0, crevasse_depth) -> boundaries rep a water-free
         crevasse (=0) or a copletely full crevasse (=crevase_depth).
+    
     """
     return (
         (
@@ -161,6 +168,7 @@ def water_depth(Rxx,
                 ):
     """Convert water height in crevasse to depth below surface in meters.
     
+    
     Parameters
     ----------
     Rxx
@@ -173,9 +181,11 @@ def water_depth(Rxx,
     ice_density : float
         ice density in kg/m^3, defaults to 917 kg/m^3
     
-    Retures
+    
+    Returns
     -------
     : float
+    
     """
     return crevasse_depth - water_height(Rxx, fracture_toughness,
                                          crevasse_depth, ice_thickness, ice_density)
@@ -222,6 +232,7 @@ def applied_stress(traction_stress, crevasse_depth, water_depth, has_water=False
     Returns
     -------
         sigma_A
+    
     """
     sigma_A = traction_stress - (2*DENSITY_ICE*g*crevasse_depth)/pi
     if has_water:
@@ -270,6 +281,7 @@ def elastic_displacement(z,
         Defaults to (1-POISSONS_RATIO).
     has_water : bool, optional
         Is there water within the crevasse? Defaults to True.
+    
     """
     # define D and alpha for a water-free crevasse
     sigma_A = applied_stress(sigma_T, crevasse_depth,
@@ -308,6 +320,7 @@ def sum_over_diff(x, y):
     Returns
     -------
     : float
+    
     """
     return (x+y) / (x-y)
 
@@ -322,6 +335,7 @@ def diff_squares(x, y):
     Returns
     -------
     : float
+    
     """
     return np.sqrt(x**2 - y**2)
 
@@ -345,5 +359,6 @@ def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
     -------
     : float, array 
         snow density at depth
+    
     """
     return ice_density - (ice_density - snow_density) * np.exp(-C*depth)

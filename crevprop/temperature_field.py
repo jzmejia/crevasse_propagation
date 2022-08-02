@@ -33,17 +33,18 @@ from . import physical_constants as pc
 class ThermalModel():
     """Thermal model used to create IceBlock's temperature field.
     
-    Note
-    ----
+    Notes
+    -----
     on ``ThermalModel`` geometry and relationship to ``IceBlock``
     This class set's up the geometry of the thermal model which differs
-    IceBlock. ThermalModel has a different horizontal ``dx`` and vertical ``dz)``
-    resolution within the 2D model domain of the IceBlock, whereby dx
-    becomes a function of ice properties and model timestep, representing
-    the horizontal distance of thermal diffusion within the ice during the 
-    thermal model's timestep. ``dz`` (vertical or depth) spacing can differ from
-    ``IceBlock``, as the thermal model will run with a corser vertical resolution
-    to save on computational expense. 
+    ``IceBlock``. ThermalModel's horizontal ``dx`` and vertical ``dz``
+    resolution differs from IceBlock, whereby ``dx`` is equal to the diffusive 
+    lengthscale of heat through the ice (e.g., becomes a function of ice 
+    properties and model timestep). We set the horzontal grid resolution of 
+    the ThermalModel equal to this value to enable thermal calculations. 
+    ``dz`` (vertical or depth) spacing can differ from ``IceBlock``, as 
+    the thermal model will run with a corser vertical resolution to save 
+    on computational expense. 
 
         
     Attributes
@@ -51,6 +52,8 @@ class ThermalModel():
     dt : int, float
         thermal model timestep in seconds
     diffusive_lengthscale: float
+        distance of thermal diffusion within the ice during the 
+        thermal model's timestep, unit in meters. 
     length : float
     ice_thickness
     dx : float, int
@@ -82,7 +85,6 @@ class ThermalModel():
         Temperature at crevasse walls in deg C.
     solver : str
         type of solver to use, defaults to ``explicit``
-
     """
     def __init__(
         self,
@@ -128,8 +130,8 @@ class ThermalModel():
                                             self.diffusive_lengthscale)
         self.dz = dz if self._ge(dz, 5) else 5
         self.z = np.arange(-self.ice_thickness, self.dz, self.dz) if isinstance(
-            self.dz, int) else self._toarray(-self.ice_thickness, self.dz, self.dz)
-        self.x = self._toarray(-self.dx-self.length, 0, self.dx)
+            self.dz, int) else np.arange(-self.ice_thickness, self.dz, self.dz)
+        self.x = np.arange(-self.dx-self.length, 0, self.dx)
 
         self.crevasses = crevasses
 
@@ -151,13 +153,12 @@ class ThermalModel():
         # self.crev_locs = 0
 
     def _diffusion_lengthscale(self):
+        """calculate the horizontal diffusion of heat through ice in meters"""
         return np.sqrt(1.090952729e-6 * self.dt)
 
     def _ge(self, n, thresh):
+        """greater than"""
         return True if n >= thresh else False
-
-    def _toarray(self, start, stop, step):
-        return np.arange(start, stop, step)
 
     def _set_upstream_bc(self, Tprofile):
         """interpolate temperature profile data points to match z res.
@@ -217,8 +218,8 @@ class ThermalModel():
             throughout ice block. Y are the temperatures at the
             same points at the next timestep
 
-        Note
-        ----
+        Notes
+        -----
         As the iceblock advects downglacier and the domain's length
         increases until reaching the specified maximum A will need
         to be recalculated. 
@@ -262,6 +263,7 @@ class ThermalModel():
 
         Solve for future temperatures while storing temperature fields for
         the the previous two timesteps 
+        
         """
         A = self.A_matrix()
 
@@ -274,6 +276,7 @@ class ThermalModel():
 
 
 
+# General thermal equations for pure ice and glacier ice
 
 class PureIce:
     """Thermal equations applicable to pure ice.
@@ -291,6 +294,7 @@ class PureIce:
         Latient heat of fusion for ice
     density: float
         density of pure ice
+        
     """
     def __init__(self, Temperature):
         """
@@ -298,6 +302,7 @@ class PureIce:
         ----------
         Temperature : float
             ice temperature in degree K.
+            
         """
         self.T = Temperature
         self.Lf = 333.5
@@ -327,6 +332,7 @@ class PureIce:
             -------
             c: float 
                 specific heat capacity of ice in Jkg^-1K^-1
+                
             """
 
             return 152.5 + 7.122 * self.T
@@ -348,6 +354,7 @@ def thermal_conductivity(density):
     ----------
     density : (float)
         density of dry snow, firn, or glacier ice in kg/m^3
+        
     """
     return 2.1e-2 + 4.2e-4 * density + 2.2e-9 * density**3
 
@@ -369,5 +376,6 @@ def thermal_diffusivity(thermal_conductivity, density, specific_heat_capacity):
     -------
     thermal_diffusivity : (float)
         units of m^2/s
+        
     """
     return thermal_conductivity/(density * specific_heat_capacity)

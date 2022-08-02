@@ -88,4 +88,3 @@ autosummary_generate = True
 # Napoleon settings
 napoleon_google_docstring = False
 napoleon_use_admonition_for_notes = True
-
