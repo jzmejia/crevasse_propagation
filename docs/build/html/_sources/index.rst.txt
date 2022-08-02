@@ -18,8 +18,6 @@ To learn more about the formulation of the crevasse propagation model see :doc:`
 
    This project is under active development.
 
-
-
 Contents
 --------
 .. toctree::
@@ -27,7 +25,7 @@ Contents
 
    overview
    usage
-   API reference <reference/index>
+   api
 
 Indices and tables
 ------------------

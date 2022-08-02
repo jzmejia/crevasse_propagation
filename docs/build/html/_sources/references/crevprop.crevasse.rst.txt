@@ -1,7 +1,7 @@
-﻿crevprop.iceblock
+﻿crevprop.crevasse
 =================
 
-.. automodule:: crevprop.iceblock
+.. automodule:: crevprop.crevasse
 
    
    
@@ -27,14 +27,11 @@
    .. autosummary::
    
       Crevasse
-      IceBlock
    
    
 
    
-.. autoclass:: crevprop.iceblock.IceBlock
-   :members:
-   :undoc-members:
+   
    
 
 
