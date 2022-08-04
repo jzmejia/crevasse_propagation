@@ -20,7 +20,7 @@ from typing import (
 )
 
 from .temperature_field import ThermalModel
-from .physical_constants import DENSITY_ICE, DENSITY_WATER, POISSONS_RATIO
+from .physical_constants import DENSITY_ICE
 from . import physical_constants as pc
 from .crevasse import Crevasse
 
@@ -152,7 +152,9 @@ class IceBlock():
         self.ice_thickness = ice_thickness
         self.dx = dx
         self.dz = dz
-        self.u_surf = u_surf
+        self.u_surf = u_surf * pc.SECONDS_IN_YEAR
+        
+        self.x_advect = abs(self.u_surf) * self.dt
 
         # crevasse field
         self.crev_spacing = crev_spacing
@@ -165,6 +167,8 @@ class IceBlock():
         self.dt_T = self._thermal_timestep(dt, thermal_freq)
         self.temperature = self._init_temperatures(T_profile, T_surface, T_bed)
 
+        
+        
     # def get_length(self):
     #     pass
 
@@ -196,6 +200,19 @@ class IceBlock():
     def _init_temperatures(self, T_profile, T_surface, T_bed):
         return ThermalModel(self.ice_thickness, self.length, self.dt_T,
                             self.dz, self.crev_locs, T_profile, T_surface, T_bed) if T_profile else None
+        
+    def advect_domain(self):
+        """increase domain length to allow crevasses to move downstream
+        
+        For the model's timestep `dt` and user-defined ice velocity `u_surf`
+        allow the 2-D model domain to expand in length by adding ice at the
+        up-stream boundary. 
+        
+        `IceBlock` attributes are modified by this function
+        `.length` will increase by the distance advected in each timestep
+        `.x` will reflect new domain length [-length,dx,0]
+        """
+        pass
 
 
 # class CrevasseField:
