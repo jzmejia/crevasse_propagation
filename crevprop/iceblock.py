@@ -22,6 +22,7 @@ from typing import (
 from .temperature_field import ThermalModel
 from .physical_constants import DENSITY_ICE
 from . import physical_constants as pc
+
 from .crevasse import Crevasse
 
 class IceBlock():
@@ -152,20 +153,27 @@ class IceBlock():
         self.ice_thickness = ice_thickness
         self.dx = dx
         self.dz = dz
-        self.u_surf = u_surf * pc.SECONDS_IN_YEAR
-        
-        self.x_advect = abs(self.u_surf) * self.dt
+        self.length = self.calc_length(u_surf, crev_count, crev_spacing)
+        # length = self.crev_count * self.crev_spacing + self.u_surf
+        self.u_surf = u_surf / pc.SECONDS_IN_YEAR
 
         # crevasse field
         self.crev_spacing = crev_spacing
         self.crev_count = crev_count if crev_count else 1
         self.crev_locs = [(-self.length, -3)]
 
-        self.x, self.z, self.length = self._init_geometry()
+        self.x, self.z = self._init_geometry()
+
+        # length = self.crev_count * self.crev_spacing + self.u_surf
+        self.u_surf = u_surf / pc.SECONDS_IN_YEAR
+        
+        self.x_advect = abs(self.u_surf) * self.dt
 
         # temperature field
         self.dt_T = self._thermal_timestep(dt, thermal_freq)
         self.temperature = self._init_temperatures(T_profile, T_surface, T_bed)
+        
+        # stress field
 
         
         
@@ -181,15 +189,21 @@ class IceBlock():
         return np.linspace(start, stop, abs(round((start-stop)/step))+1)
 
     def _init_geometry(self):
-        """initialize ice block geometry"""
+        """initialize ice block geometry
+        
+        Return
+        ------
+        x : np.array
+            1-D array defining the horizontal (x-direction) of ice block
+            [-length : dx : 0]
+        z : np.array
+            1-D array defining the vertical (z-direction) of the ice block
+            [0 : dz : ice_thickness]
+        
+        """
         x = self._toarray(-self.dx-self.length, 0, self.dx)
         z = self._toarray(-self.ice_thickness, 0, self.dz)
-        length = self.crev_count * self.crev_spacing + self.u_surf
-        return x, z, length
-
-    def advect_domain(self):
-        """advect domain downglacier in accordance with ice velocity"""
-        pass
+        return x, z
 
     def _thermal_timestep(self, timestep, thermal_freq):
         if round(365 % (timestep*thermal_freq)) != 0:
@@ -199,7 +213,8 @@ class IceBlock():
 
     def _init_temperatures(self, T_profile, T_surface, T_bed):
         return ThermalModel(self.ice_thickness, self.length, self.dt_T,
-                            self.dz, self.crev_locs, T_profile, T_surface, T_bed) if T_profile else None
+                            self.dz, self.crev_locs, T_profile, T_surface, T_bed
+                            ) if T_profile else None
         
     def advect_domain(self):
         """increase domain length to allow crevasses to move downstream
@@ -213,6 +228,37 @@ class IceBlock():
         `.x` will reflect new domain length [-length,dx,0]
         """
         pass
+    
+    def stress_field(self):
+        pass
+    
+    def calc_length(self, usurf, crev_count, crev_spacing):
+        """Calculate initial length of ice block using class init args.
+        
+        ice block created to initially have 1 year of ice at the downstream
+        end of the ice block ahead of the first crevasse's location. This is
+        specified to keep the crevasse cold. Otherwise the downstream boundary
+        condition becomes diffusively influenced by the downstream-most crevasse.
+        
+        condition: if model is run from t=0 and no crevasses exist the
+        ice block length will just be the 1 year of ice ahead of the first crev.
+        If class initialized for a pre-existing crevasse field the length depends
+        on the number of crevasses and spacing of the crevasse field in addition to
+        the one year of ice at the downstream end.
+        
+        Parameters
+        ----------
+        usurf 
+        crev_count
+        crev_spacing
+        
+        """
+        if crev_count and crev_count >= 1:
+            length = crev_count*crev_spacing + usurf
+        else:
+            length = usurf
+        return length
+    
 
 
 # class CrevasseField:
@@ -290,7 +336,8 @@ class IceBlock():
 #             K_I(1) = F(lambda)*Rxx*sqrt(pi*crevasse_depth)
 #             where lambda = crevasse_depth / ice_thickness and
             
-#             F(lambda) = 1.12 - 0.23*lambda + 10.55*lambda**2 - 12.72*lambda**3 + 30.39*lambda**4
+#             F(lambda) = 1.12 - 0.23*lambda + 10.55*lambda**2 - 12.72*lambda**3 
+#                   + 30.39*lambda**4
 
 #         For shallow crevasses::
         
@@ -391,8 +438,9 @@ class IceBlock():
 #                  diff_squares(self.depth, z)
 #                  + (c1 * (z**2-self.water_depth**2)*0.5*np.log(abs(sum_over_diff(
 #                     diff_squares(self.depth, self.water_depth), diff_squares(self.depth, z)))))
-#                  - c1*self.water_depth*z*np.log(abs(sum_over_diff(self.water_depth*diff_squares(
-#                      self.depth, z), z*diff_squares(self.depth, self.water_depth))))
+#                  - c1*self.water_depth*z*np.log(abs(sum_over_diff(self.water_depth
+#                       *diff_squares(self.depth, z), 
+#                       z*diff_squares(self.depth, self.water_depth))))
 #                  + c1*self.water_depth**2 *
 #                  np.log(abs(sum_over_diff(diff_squares(self.depth, z),
 #                                           diff_squares(self.depth, self.water_depth))))
