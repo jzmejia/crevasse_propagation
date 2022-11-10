@@ -91,10 +91,10 @@ class IceBlock():
         ice_thickness,
         dx,
         dz,
-        dt,
-        crev_spacing,
+        dt=0.5,
+        thermal_freq=5,
+        crev_spacing=30,
         crev_count=None,
-        thermal_freq=10,
         T_profile=None,
         T_surface=None,
         T_bed=None,
@@ -113,12 +113,13 @@ class IceBlock():
             vertical sampling resolution within ice block (m)
         dt : float, int
             Timestep in days to run crevasse model (days)
+            defaults to 0.5 days. 
         crev_spacing : float, int
             Spacing between crevasses in crevasse field (m)
         thermal_freq : float, int
             Multiple of timestep to run thermal model. 1 would run the 
-            thermal model at every timestep whereas a value of 10 would 
-            run the model after every 10 timesteps. Defaults to 10.
+            thermal model at every timestep whereas a value of 5 would 
+            run the model after every 5 timesteps. Defaults to 5.
         T_profile : np.array, pd.Series, pd.DataFrame, optional
             Temperature profile for upstream boundary condition. The 
             profile will be interpolated to match the thermal model's 
@@ -167,7 +168,8 @@ class IceBlock():
         # length = self.crev_count * self.crev_spacing + self.u_surf
         self.u_surf = u_surf / pc.SECONDS_IN_YEAR
         
-        self.x_advect = abs(self.u_surf) * self.dt
+        # <NOTE: should round this value>
+        self.x_advect = round(abs(self.u_surf) * self.dt,4)
 
         # temperature field
         self.dt_T = self._thermal_timestep(dt, thermal_freq)
@@ -201,7 +203,7 @@ class IceBlock():
             [0 : dz : ice_thickness]
         
         """
-        x = self._toarray(-self.dx-self.length, 0, self.dx)
+        x = self._toarray(-self.length, 0, self.dx)
         z = self._toarray(-self.ice_thickness, 0, self.dz)
         return x, z
 
