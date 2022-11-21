@@ -164,19 +164,19 @@ class IceBlock():
         # crevasse field
         self.crev_locs = [(-self.length, -3)]
 
-        # ice velocity u-horizontal, v-vertical
-        self.u_surf = u_surf / pc.SECONDS_IN_YEAR
-        self.u = np.tile(self.u_surf, ())
-        self.v = None
-
-        # <NOTE: should round this value>
-        self.x_advect = round(abs(self.u_surf) * self.dt, 4)
-
         # temperature field
 
         self.temperature = self._init_temperatures(T_profile, T_surface, T_bed)
 
+        # ice velocity u-horizontal, v-vertical
+        self.u_surf = u_surf / pc.SECONDS_IN_YEAR
+        # self.u = np.tile(
+        #     self.u_surf*np.ones(self.temperature.z.size()), (1, len(self.x)))
+        # self.v = None
         # stress field
+
+        # <NOTE: should round this value>
+        # self.x_advect = round(abs(self.u_surf) * self.dt, 4)
 
     # def get_length(self):
     #     pass
@@ -214,9 +214,9 @@ class IceBlock():
         return round(self.dt * thermal_freq)
 
     def _init_temperatures(self, T_profile, T_surface, T_bed):
-        return ThermalModel(self.ice_thickness, self.length, self.dt_T,
-                            self.dz, self.crev_locs, T_profile, T_surface, T_bed
-                            ) if T_profile else None
+        return None if isinstance(T_profile, type(None)) else ThermalModel(
+            self.ice_thickness, self.length, self.dt_T, self.dz, self.dx,
+            self.crev_locs, T_profile, T_surface, T_bed)
 
     def advect_domain(self):
         """increase domain length to allow crevasses to move downstream
