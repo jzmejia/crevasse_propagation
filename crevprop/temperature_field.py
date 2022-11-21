@@ -96,6 +96,7 @@ class ThermalModel():
         length: Union[int, float],
         dt_T: Union[int, float],
         dz: Union[int, float],
+        dx: float,
         crevasses,
         T_profile,
         T_surface=None,
@@ -132,6 +133,7 @@ class ThermalModel():
         # self.dx = (0.5*self.length) / round(0.5*self.length /
         # self.diffusive_lengthscale)
         self.dz = dz if self._ge(dz, 5) else 5
+        self.dx = dx
         # NOTE: end of range = dx or dz to make end of array = 0
         self.z = np.arange(-self.ice_thickness, self.dz, self.dz) if isinstance(
             self.dz, int) else np.arange(-self.ice_thickness, self.dz, self.dz)
