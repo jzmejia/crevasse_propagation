@@ -23,7 +23,35 @@ from . import physical_constants as pc
 from .crevasse import Crevasse
 
 
-class IceBlock():
+class Ice(object):
+    def __init__(self,
+                 fracture_toughness=10e3):
+        self.density = 917
+        self.heat_capacity = 2115.3
+        self.heat_capacity_slope = 7.79293
+        self.thermal_conductivity = self.ki = 2.1
+        self.latient_heat_of_freezing = self.Lf = 3.35e5
+        self.thermal_diffusivity = self.kappa = self.thermal_diffusivity()
+        self.units = self._set_units()
+
+    def thermal_diffusivity(self):
+        return self.thermal_conductivity / self.density / self.heat_capacity
+
+    def _set_unit(self):
+        units = {
+            'density': 'kg/m^3',
+            'thermal conductivity': 'J/m/K/s',
+            'thermal diffusivity': 'm^2/s',
+            'latient heat of freezing': 'J/kg',
+            'heat capacity': 'J/kg/K',
+            'melting point at 1 atm': 'K',
+            'fracture toughness': 'MPa m^-1/2',
+            'driving stress': 'kPa'
+        }
+        return units
+
+
+class IceBlock(Ice):
     """
     Two-dimensional ice block geometry defining model domain.
 

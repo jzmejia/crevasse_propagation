@@ -1,8 +1,7 @@
-# Need to update this file by 
+# Need to update this file by
 # 1. switching filename to all caps
 # 2. grouping valuables
 # 3. using enum? this way you can access units
-
 
 
 # import numpy as np
@@ -34,7 +33,6 @@ THERMAL_CONDUCTIVITY_ICE = 2.1
 THERMAL_CONDUCTIVITY_ROCK = 3.3
 
 
-
 # ice properties
 HEAT_CAPACITY_ICE = 2115.3
 HEAT_CAPACITY_SLOPE_ICE = 7.79293
@@ -45,8 +43,8 @@ LATIENT_HEAT_OF_FUSION = 3.35e5
 
 THERMAL_DIFFUSIVITY = KAPPA = THERMAL_CONDUCTIVITY_ICE / \
     DENSITY_ICE / HEAT_CAPACITY_ICE
-    
-    
+
+
 FRACTURE_TOUGHNESS = 10e3
 
 units = {
