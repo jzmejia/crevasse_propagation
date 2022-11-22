@@ -101,7 +101,8 @@ class ThermalModel():
         T_profile,
         T_surface=None,
         T_bed=None,
-        solver=None
+        solver=None,
+        udef=0
     ):
         """Apply temperature advection and diffusion through ice block.
 
@@ -124,6 +125,9 @@ class ThermalModel():
             Air temperature in deg C. Defaults to 0.
         T_bed : float, int
             Temperature at ice-bed interface in deg C. Defaults to None.
+        udef : deformation velocity, defaults to 0 m/a
+            Will be able to assign an array for variable deformation
+            velocity with depth but this is not yet supported.
         """
         # geometry
         self.length = length
@@ -141,6 +145,8 @@ class ThermalModel():
 
         self.crevasses = crevasses
 
+        self.udef = udef  # defaults to 0, can be int/float/depth vector
+
         # Boundary Conditions
         self.T_surface = T_surface if T_surface else 0
         self.T_bed = T_bed if T_bed else 0
@@ -156,6 +162,11 @@ class ThermalModel():
         self.T_crev = 0
 
         self.solver = solver if solver else "explicit"
+
+        # For solver to consider horizontal ice velocity a udef term
+        # needs to be added at some point
+        # For sovler to consider vertical ice velocity need ablation
+
         # self.crev_locs = 0
 
     def _diffusion_lengthscale(self):
@@ -167,7 +178,10 @@ class ThermalModel():
         return True if n >= thresh else False
 
     def _set_upstream_bc(self, Tprofile):
-        """interpolate temperature profile data points to match z res.
+        """interpolate Tprofile to thermal model vertical resolution.
+
+        NOTE: elevation should be negative and ordered as 
+        `[-ice_thickness:0]`
 
         Parameters
         ----------
@@ -224,11 +238,15 @@ class ThermalModel():
             throughout ice block. Y are the temperatures at the
             same points at the next timestep
 
+
+
         Notes
         -----
         As the iceblock advects downglacier and the domain's length
         increases until reaching the specified maximum A will need
         to be recalculated. 
+
+        internal deformation is not currently considered
 
         Returns
         -------
@@ -257,15 +275,17 @@ class ThermalModel():
         # create inversion matrix A
         A = np.eye(self.T.size)
 
+        # internal deformation (horizontal )
         for i in range(nx, self.T.size - nx):
             if i % nx != 0 and i % nx != nx-1 and i not in crev_idx:
-                A[i, i] = 1 + 2*sx + 2*sz
+                A[i, i] = 1 + 2*sx + 2*sz - self.dt/self.dx * self.udef
                 A[i, i-nx] = A[i, i+nx] = -sz
-                A[i, i+1] = A[i, i-1] = -sx
+                A[i, i-1] = -sx
+                A[i, i+1] = -sx + self.dt / self.dx * self.udef
 
         return A
 
-    def _solve_for_T(self):
+    def _calc_temperature(self):
         """Solve for future temp w/ implicit finite difference scheme
 
         Solve for future temperatures while storing temperature fields
