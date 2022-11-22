@@ -304,7 +304,7 @@ class ThermalModel():
 
 # General thermal equations for pure ice and glacier ice
 
-class PureIce:
+class PureIce(object):
     """Thermal equations applicable to pure ice.
 
     Parameters
