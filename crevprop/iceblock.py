@@ -168,15 +168,13 @@ class IceBlock():
 
         self.temperature = self._init_temperatures(T_profile, T_surface, T_bed)
 
-        # ice velocity u-horizontal, v-vertical
+        # ice velocity
         self.u_surf = u_surf / pc.SECONDS_IN_YEAR
-        # self.u = np.tile(
-        #     self.u_surf*np.ones(self.temperature.z.size()), (1, len(self.x)))
-        # self.v = None
+
         # stress field
 
         # <NOTE: should round this value>
-        # self.x_advect = round(abs(self.u_surf) * self.dt, 4)
+        self.x_advect = round(abs(self.u_surf) * self.dt, 4)
 
     # def get_length(self):
     #     pass
