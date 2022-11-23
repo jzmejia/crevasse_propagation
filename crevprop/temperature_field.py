@@ -101,7 +101,7 @@ class ThermalModel():
         T_profile,
         T_surface=None,
         T_bed=None,
-        solver=None,
+        # solver=None,
         udef=0
     ):
         """Apply temperature advection and diffusion through ice block.
@@ -160,8 +160,6 @@ class ThermalModel():
         self.Tdf = pd.DataFrame(
             data=self.T, index=self.z, columns=np.round(self.x))
         self.T_crev = 0
-
-        self.solver = solver if solver else "explicit"
 
         # For solver to consider horizontal ice velocity a udef term
         # needs to be added at some point
@@ -261,16 +259,7 @@ class ThermalModel():
         sz = pc.THERMAL_DIFFUSIVITY * self.dt / self.dz ** 2
 
         # Apply crevasse location boundary conditions to A
-        # by creating a list of matrix indicies that shouldn't be assigned
-        crev_idx = []
-        for crev in self.crevasses:
-            # surface coordinate already covered by surface boundary condition
-            # use to find depth values
-            crev_x = (nx * nz - 1) - abs(round(crev[0]/self.dx))
-            crev_depth = crev[1]
-            if crev_depth >= 2*self.dz and crev_depth < self.ice_thickness:
-                crev_idx.extend(
-                    np.arange(crev_x-(np.floor(crev_depth/self.dz)-1)*nx, crev_x, nx))
+        crev_idx = self.find_crev_idx()
 
         # create inversion matrix A
         A = np.eye(self.T.size)
@@ -285,14 +274,36 @@ class ThermalModel():
 
         return A
 
-    def _calc_temperature(self):
+    def find_crev_idx(self):
+        '''creating a list of matrix indicies for crevasse locations'''
+        crev_idx = []
+        for crev in self.crevasses:
+            # surface coordinate already covered by surface boundary condition
+            # use to find depth values
+            crev_x = (self.x.size * self.z.size - 1) \
+                - abs(round(crev[0]/self.dx))
+            crev_depth = crev[1]
+            if crev_depth >= 2*self.dz and crev_depth < self.ice_thickness:
+                crev_idx.extend(np.arange(
+                    crev_x - (np.floor(crev_depth/self.dz) - 1) * self.x.size,
+                    crev_x, self.x.size))
+        return crev_idx
+
+    def calc_temperature(self):
         """Solve for future temp w/ implicit finite difference scheme
 
         Solve for future temperatures while storing temperature fields
         for the the previous two timesteps 
 
         """
+        self.Tnm1 = self.T0
+        self.T0 = self.T
+
         A = self.A_matrix()
+
+        # compute rhs
+        rhs = self.T.flatten()
+        # rhs(crevidx) = Tcrev
 
         pass
 
