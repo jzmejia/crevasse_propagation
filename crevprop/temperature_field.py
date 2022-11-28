@@ -26,6 +26,7 @@ Thermal model components include:
 import pandas as pd
 import numpy as np
 from typing import Union, Tuple
+import matplotlib.pyplot as plt
 
 from .physical_constants import DENSITY_ICE
 from . import physical_constants as pc
@@ -153,7 +154,7 @@ class ThermalModel():
         self.T_upglacier = self._set_upstream_bc(T_profile)
         # left = upglacier end, right = downglacier
         self.T = np.outer(self.T_upglacier, np.linspace(1, 0.99, self.x.size))
-
+        self.T_downglacier = self.T[:, -1]
         # initialize temperatures used for leap-frog advection
         self.T0 = None
         self.Tnm1 = None
@@ -226,7 +227,7 @@ class ThermalModel():
     #     return
 
     def A_matrix(self):
-        """create the A matrix to solve for future temperatures
+        """Physical coefficient matrix defining heat transfer properties
 
         **A** solves for future temperatures within iceblock following::
 
@@ -250,10 +251,13 @@ class ThermalModel():
         -------
         A : np.ndarray
             square matrix with coefficients to calculate temperatures 
-            within the ice block 
+            within the ice block. matrix shape = nx*nz, nx*nz where
+            nx is the number of points in the x direction of the 
+            ThermalModel domain and z is the number of points in the
+            z direction. 
         """
         nx = self.x.size
-        nz = self.z.size
+        # nz = self.z.size
 
         sx = pc.THERMAL_DIFFUSIVITY * self.dt / self.dx ** 2
         sz = pc.THERMAL_DIFFUSIVITY * self.dt / self.dz ** 2
@@ -275,18 +279,27 @@ class ThermalModel():
         return A
 
     def find_crev_idx(self):
-        '''creating a list of matrix indicies for crevasse locations'''
+        '''creating a list of matrix indicies for crevasse locations
+
+        Returns
+        -------
+            crev_idx : list of crevasse indicies within thermal model
+        '''
         crev_idx = []
         for crev in self.crevasses:
-            # surface coordinate already covered by surface boundary condition
-            # use to find depth values
-            crev_x = (self.x.size * self.z.size - 1) \
-                - abs(round(crev[0]/self.dx))
+            # crevasse index at ice surface
+            crev_x = (self.x.size * self.z.size - 1) - \
+                abs(round(crev[0]/self.dx))
+
+            # find depth indicies for crevasse
             crev_depth = crev[1]
             if crev_depth >= 2*self.dz and crev_depth < self.ice_thickness:
                 crev_idx.extend(np.arange(
                     crev_x - (np.floor(crev_depth/self.dz) - 1) * self.x.size,
                     crev_x, self.x.size))
+            else:
+                crev_idx.extend([crev_x])
+        self.crev_idx = crev_idx
         return crev_idx
 
     def calc_temperature(self):
@@ -299,11 +312,17 @@ class ThermalModel():
         self.Tnm1 = self.T0
         self.T0 = self.T
 
+        nx = self.x.size
+
         A = self.A_matrix()
 
         # compute rhs
         rhs = self.T.flatten()
-        # rhs(crevidx) = Tcrev
+        rhs[:, self.crev_idx] = self.Tcrev
+        rhs[:nx] = self.T_bed
+        rhs[-nx:] = self.T_surface
+        rhs[:, np.arange(nx, self.T.size-nx, nx)] = self.T_upglacier
+        rhs[:, np.arange(2*nx-1, self.T.size-nx, nx)] = self.T_downglacier
 
         pass
 
@@ -350,33 +369,33 @@ class PureIce(object):
         self.thermal_diffusivity = self.thermal_conductivity / (
             self.density * self.specific_heat_capacity)
 
-        def specific_heat_capacity(self):
-            """specific heat capacity for pure ice (J/kg/K)
+    def specific_heat_capacity(self):
+        """specific heat capacity for pure ice (J/kg/K)
 
-            Specific heat capacity, c, per unit mass of ice in SI units. 
-            Note: c of dry snow and ice does not vary with density 
-            because the heat needed to warm the air and vapor between 
-            grains is neglibible. (see Cuffey, ch 9, pp 400)
+        Specific heat capacity, c, per unit mass of ice in SI units. 
+        Note: c of dry snow and ice does not vary with density 
+        because the heat needed to warm the air and vapor between 
+        grains is neglibible. (see Cuffey, ch 9, pp 400)
 
-            c = 152.5 + 7.122(T)
+        c = 152.5 + 7.122(T)
 
-            Parameters
-            ----------
-            temperature: float
-                ice temperature in degrees Kelvin
+        Parameters
+        ----------
+        temperature: float
+            ice temperature in degrees Kelvin
 
-            Returns
-            -------
-            c: float 
-                specific heat capacity of ice in Jkg^-1K^-1
+        Returns
+        -------
+        c: float 
+            specific heat capacity of ice in Jkg^-1K^-1
 
-            """
+        """
 
-            return 152.5 + 7.122 * self.T
+        return 152.5 + 7.122 * self.T
 
-        def thermal_conductivity(self):
-            """calc thermal conductivy for pure ice (W/m/K)"""
-            return 9.828 * np.exp(-5.7e-3 * self.T)
+    def thermal_conductivity(self):
+        """calc thermal conductivy for pure ice (W/m/K)"""
+        return 9.828 * np.exp(-5.7e-3 * self.T)
 
 
 # for not pure ice
