@@ -17,7 +17,6 @@ from typing import (
 )
 
 from .temperature_field import ThermalModel
-from .physical_constants import DENSITY_ICE
 from . import physical_constants as pc
 
 from .crevasse import Crevasse
@@ -129,8 +128,8 @@ class IceBlock(Ice):
         T_surface=None,
         T_bed=None,
         u_surf=100.,
-        fracture_toughness=100e3,
-        ice_density=DENSITY_ICE
+        fracture_toughness=10e3,
+        ice_density=917
     ):
         """
         Parameters
@@ -173,8 +172,8 @@ class IceBlock(Ice):
         super().__init__(ice_density, fracture_toughness)
 
         # material properties
-        self.density = ice_density
-        self.fracture_toughness = fracture_toughness
+        # self.density = ice_density
+        # self.fracture_toughness = fracture_toughness
 
         # time domain
         self.dt = dt * pc.SECONDS_IN_DAY
