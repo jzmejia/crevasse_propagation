@@ -25,14 +25,16 @@ from .crevasse import Crevasse
 
 class Ice(object):
     def __init__(self,
+                 density=917,
                  fracture_toughness=10e3):
-        self.density = 917
+        self.density = density
         self.heat_capacity = 2115.3
         self.heat_capacity_slope = 7.79293
         self.thermal_conductivity = self.ki = 2.1
         self.latient_heat_of_freezing = self.Lf = 3.35e5
-        self.thermal_diffusivity = self.kappa = self.thermal_diffusivity()
-        self.units = self._set_units()
+        self.kappa = self.thermal_diffusivity()
+        self.units = self._set_unit()
+        self.fracture_toughness = fracture_toughness
 
     def thermal_diffusivity(self):
         return self.thermal_conductivity / self.density / self.heat_capacity
@@ -167,6 +169,8 @@ class IceBlock(Ice):
             future versions aim to allow a density profile.
 
         """
+
+        super().__init__(ice_density, fracture_toughness)
 
         # material properties
         self.density = ice_density
