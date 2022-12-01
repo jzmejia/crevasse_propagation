@@ -56,7 +56,7 @@ class Ice(object):
         self.T = temperature
         self.T_kelvin = self.C_to_K(temperature)
 
-        self.specific_heat_capacity = self.calc_specific_heat_capacity()
+        self.specific_heat_capacity = self.calc_specific_heat_capacity(self.T)
         self.heat_capacity_intercept = 2115.3
         self.heat_capacity_slope = 7.79293
 
@@ -98,10 +98,10 @@ class Ice(object):
 
     def thermal_conductivity_pure_ice(self, T=0):
         return 9.828 * np.exp(-5.7e-3 * self.C_to_K(T))
-    
+
     def van_dusen(density):
-        """Depth dependant thermal conductivity for dry snow, firn, and ice
-        Van Dusen 1929
+        """Depth dependant thermal conductivity for dry snow, firn, ice
+        Van Dusen (1929)
 
         This equation typically gives a lower limit in most cases
 
@@ -112,23 +112,24 @@ class Ice(object):
 
         """
         return 2.1e-2 + 4.2e-4 * density + 2.2e-9 * density**3
-    
+
     def schwerdtfeger(self, density):
-        # density must be less than the density of pure ice, find threshold to use here
+        # density must be less than the density of pure ice,
+        # find threshold to use here
         pure_ice = self.thermal_conductivity_pure_ice
         pass
-    
+
     def thermal_conductivitiy_firn(self, x, relationship="density"):
         """calculate thermal conductivity of firn
-        
+
         This function implements the depth or density dependant
         empirical relationships described by Oster and Albert (2022).
-        
+
         Use the density relation for depths from 0-48 m. When the
         the density of pure ice is entered into this equation a thermal
         conductivity `k_{firn}(p_ice)=2.4` W/mK which is the known 
         thermal conductivity of pure ice at -25 deg C.
-        
+
         The depth dependant relationship predicts the thermal 
         conductivity of pure ice for depths around 100-110 m. This is
         consistant with the field-measured depth of the firn-ice
@@ -147,8 +148,7 @@ class Ice(object):
             k_firn = 0.144 * np.exp(0.00308 * x)
         elif relationship == "depth":
             k_firn = 0.536 * np.exp(0.0144 * x)
-        
-    
+
     def calc_thermal_conductivity(self, T=0, density=917, method="empirical"):
         """calc thermal conductivy using specified method"""
         if method == "van_dusen":
@@ -159,11 +159,18 @@ class Ice(object):
             kt = self.thermal_conductivity_pure_ice(T)
 
         return kt
-    
-    
 
     def thermal_diffusivity(self):
-        return self.thermal_conductivity / self.density / self.heat_capacity
+        """calculate thermal diffusivity
+
+        thermal_conductivity / density * specific_heat_capacity
+
+
+        Returns
+        -------
+        thermal diffusivity with units of m^2/s
+        """
+        return self.thermal_conductivity / self.density / self.specific_heat_capacity
 
     def _set_unit(self):
         units = {
