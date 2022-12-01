@@ -37,8 +37,8 @@ class Ice(object):
     """
 
     def __init__(self,
-                 density=917.,
-                 temperature=0,
+                 ice_density=917.,
+                 ice_temperature=0,
                  fracture_toughness=10e3):
         """_summary_
 
@@ -52,11 +52,10 @@ class Ice(object):
             fracture toughness of ice, by default 10e3
         """
 
-        self.density = density
-        self.T = temperature
-        self.T_kelvin = self.C_to_K(temperature)
+        self.ice_density = ice_density
+        self.ice_temperature = ice_temperature
 
-        self.specific_heat_capacity = self.calc_specific_heat_capacity(self.T)
+        self.specific_heat_capacity = 2097
         self.heat_capacity_intercept = 2115.3
         self.heat_capacity_slope = 7.79293
 
@@ -99,7 +98,7 @@ class Ice(object):
     def thermal_conductivity_pure_ice(self, T=0):
         return 9.828 * np.exp(-5.7e-3 * self.C_to_K(T))
 
-    def van_dusen(density):
+    def van_dusen(self, density):
         """Depth dependant thermal conductivity for dry snow, firn, ice
         Van Dusen (1929)
 
@@ -148,6 +147,7 @@ class Ice(object):
             k_firn = 0.144 * np.exp(0.00308 * x)
         elif relationship == "depth":
             k_firn = 0.536 * np.exp(0.0144 * x)
+        return k_firn
 
     def calc_thermal_conductivity(self, T=0, density=917, method="empirical"):
         """calc thermal conductivy using specified method"""
@@ -170,7 +170,7 @@ class Ice(object):
         -------
         thermal diffusivity with units of m^2/s
         """
-        return self.thermal_conductivity / self.density / self.specific_heat_capacity
+        return self.thermal_conductivity / (self.ice_density * self.specific_heat_capacity)
 
     def _set_unit(self):
         units = {
@@ -254,8 +254,8 @@ class IceBlock(Ice):
         self,
         ice_thickness,
         dz,
-        dt=1,
-        thermal_freq=5,
+        dt=0.5,
+        thermal_freq=2,
         crev_spacing=30,
         crev_count=None,
         T_profile=None,
@@ -330,7 +330,6 @@ class IceBlock(Ice):
         self.crev_locs = [(-self.length, -3)]
 
         # temperature field
-
         self.temperature = self._init_temperatures(T_profile, T_surface, T_bed)
 
         # ice velocity
@@ -338,7 +337,7 @@ class IceBlock(Ice):
 
         # stress field
 
-        # <NOTE: should round this value>
+        #
         self.x_advect = round(abs(self.u_surf) * self.dt, 4)
 
     # def get_length(self):
@@ -351,7 +350,7 @@ class IceBlock(Ice):
 
     def diffusion_length(self):
         """calculate the horizontal diffusion of heat through ice, m"""
-        return np.sqrt(pc.THERMAL_DIFFUSIVITY * self.dt_T)
+        return np.sqrt(self.kappa * self.dt_T)
 
     def _init_geometry(self):
         """initialize ice block geometry
@@ -392,6 +391,28 @@ class IceBlock(Ice):
         `.length` increases by the distance advected in each timestep
         `.x` will reflect new domain length [-length,dx,0]
         """
+
+        # TODO! because xadvect can be smaller than dx, calculate di based
+        # on cumulative timestep counter n, and subtract added, the
+        # tracker of how much the domain has grown over model run
+        # added will need to be initalized before this
+        # n will need to be initialized outside or given to function
+
+        # di = round(n * self.x_advect / self.dx) - added
+
+        # add conditional for if di >= dx, if not, don't add anything
+        # recalculate length
+        # recalculate x
+
+        # reassign ice surface temperature if variable
+        # recalculate T/update thermal model
+        # track crevasse location (downglacier-most)
+
+        # detach domain if necessary
+        # update thermal model upglacier boundary condition if applicable
+
+        # update u and v velocity profiles if applicable
+
         pass
 
     def stress_field(self):
