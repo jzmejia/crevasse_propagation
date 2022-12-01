@@ -350,7 +350,7 @@ class IceBlock(Ice):
 
     def diffusion_length(self):
         """calculate the horizontal diffusion of heat through ice, m"""
-        return np.sqrt(pc.THERMAL_DIFFUSIVITY * self.dt_T)
+        return np.sqrt(self.kappa * self.dt_T)
 
     def _init_geometry(self):
         """initialize ice block geometry
@@ -392,7 +392,26 @@ class IceBlock(Ice):
         `.x` will reflect new domain length [-length,dx,0]
         """
 
-        #
+        # TODO! because xadvect can be smaller than dx, calculate di based
+        # on cumulative timestep counter n, and subtract added, the
+        # tracker of how much the domain has grown over model run
+        # added will need to be initalized before this
+        # n will need to be initialized outside or given to function
+
+        # di = round(n * self.x_advect / self.dx) - added
+
+        # add conditional for if di >= dx, if not, don't add anything
+        # recalculate length
+        # recalculate x
+
+        # reassign ice surface temperature if variable
+        # recalculate T/update thermal model
+        # track crevasse location (downglacier-most)
+
+        # detach domain if necessary
+        # update thermal model upglacier boundary condition if applicable
+
+        # update u and v velocity profiles if applicable
 
         pass
 
