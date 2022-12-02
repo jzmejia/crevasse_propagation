@@ -28,11 +28,10 @@ import numpy as np
 from typing import Union, Tuple
 import matplotlib.pyplot as plt
 
-from .physical_constants import DENSITY_ICE
-from . import physical_constants as pc
+from .iceblock import Ice
 
 
-class ThermalModel():
+class ThermalModel(Ice):
     """Thermal model used to create IceBlock's temperature field.
 
     Notes
@@ -142,9 +141,7 @@ class ThermalModel():
         # NOTE: end of range = dx or dz to make end of array = 0
         self.z = np.arange(-self.ice_thickness, self.dz, self.dz) if isinstance(
             self.dz, int) else np.arange(-self.ice_thickness, self.dz, self.dz)
-        self.x = np.arange(-self.dx-self.length, 0, self.dx)
-
-        self.crevasses = crevasses
+        self.x = np.arange(-self.dx-self.length, self.dx, self.dx)
 
         self.udef = udef  # defaults to 0, can be int/float/depth vector
 
@@ -155,22 +152,23 @@ class ThermalModel():
         # left = upglacier end, right = downglacier
         self.T = np.outer(self.T_upglacier, np.linspace(1, 0.99, self.x.size))
         self.T_downglacier = self.T[:, -1]
+        self.T_crev = 0
+
         # initialize temperatures used for leap-frog advection
         self.T0 = None
         self.Tnm1 = None
-        self.Tdf = pd.DataFrame(
-            data=self.T, index=self.z, columns=np.round(self.x))
-        self.T_crev = 0
 
         # For solver to consider horizontal ice velocity a udef term
         # needs to be added at some point
         # For sovler to consider vertical ice velocity need ablation
 
-        # self.crev_locs = 0
+        self.crevasses = crevasses
+        self.crev
+        self.crev_idx = self.find_crev_idx()
 
     def _diffusion_lengthscale(self):
         """calculate the horizontal diffusion of heat through ice, m"""
-        return np.sqrt(pc.THERMAL_DIFFUSIVITY * self.dt_T)
+        return np.sqrt(self.kappa * self.dt)
 
     def _ge(self, n, thresh):
         """greater than"""
@@ -214,6 +212,10 @@ class ThermalModel():
         T[idx] = self.T_bed
 
         return T.values
+
+    def df(self):
+        """return pandas DataFrame object of Temperature Field"""
+        return pd.DataFrame(data=self.T, index=self.z, columns=np.round(self.x))
 
     def t_resample(self, dz):
         """resample temperatures to match z resolution"""
@@ -259,8 +261,8 @@ class ThermalModel():
         nx = self.x.size
         # nz = self.z.size
 
-        sx = pc.THERMAL_DIFFUSIVITY * self.dt / self.dx ** 2
-        sz = pc.THERMAL_DIFFUSIVITY * self.dt / self.dz ** 2
+        sx = self.kappa * self.dt / self.dx ** 2
+        sz = self.kappa * self.dt / self.dz ** 2
 
         # Apply crevasse location boundary conditions to A
         crev_idx = self.find_crev_idx()
@@ -331,17 +333,56 @@ class ThermalModel():
         # add source term near crevasses
         # upstream of crevasse
         # rhs[crev_idx - 1] = rhs[crev_idx -1] + (Lf/B * virtualblue[])/dx
-        
+
         # downstream of creasse
         # rhs[crev_idx + 1] = rhs[crev_idx +1] + (Lf/B * virtualblue[])/dx
-        
-        
+
         # compute solution vector
-        T = np.linalg.solve(A,rhs)
+        T = np.linalg.solve(A, rhs)
         return T.reshape(self.T.shape)
 
     def refreezing(self):
-        bluelayer = self.dt * pc.THERMAL_CONDUCTIVITY_ICE / \
-            (pc.LATIENT_HEAT_OF_FUSION * DENSITY_ICE) * ()
+        """Find refrozen layer thickness at crevasse walls
+
+        The refreezing rate of meltwater depends on the horizontal
+        temperature gradient in the ice of the crevasse walls dT/dx
+
+        The refreezing rate of meltwater Vfrz(z) can be approximated
+        as follows:
+
+        V_frz(z)/dt = ki/Lf*rho_i [dT_L(x,z)/dx + dT_R(x,z)/dx]
+        where
+        ki is the thermal conductivity of ice
+        Lf is the latent heat of freezing
+        dt thermal model timestep
+        TL and TR are the temperatures at the left and right crevasse
+            walls respectively
+        dx = the diffusion length over a year (~5 meters)
+
+        Requirements: 
+            crev_index
+
+        Updates: 
+
+
+        """
+        # calculate refreezing for each crevasse
+
+        # maybe initialize virtual blue as zeros(self.z.length,num_crev)
+
+        # calculate how much volume will refreeze in a year
+        # indicies diffusive lengthscale for 1 year = 5.6 meters
+
+        # refrozen layer thickness
+
+        # only make calculation if there is enough info in T
+        # model must have advected more than 5.6 m
+        # (1 year thermal diffusivity) from crevasse location
+
+        ind = round(5.6/self.dx)
+
+        if self.x[0] >= min([i[0] for i in self.crevasses]) - 5.6:
+
+            Vfrz = self.dt * (self.ki/self.Lf/self.ice_density) * ()
+
         pass
-    

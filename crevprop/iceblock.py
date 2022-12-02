@@ -1,5 +1,5 @@
 """
-The main container for the crevasse propagation model, holding and 
+The main container for the crevasse propagation model, holding and
 initializing model geometry
 """
 import numpy as np
@@ -33,7 +33,7 @@ class Ice(object):
     ----------
     density:
     T: float, int
-        ice temperature in degrees Celcius 
+        ice temperature in degrees Celcius
     """
 
     def __init__(self,
@@ -75,9 +75,9 @@ class Ice(object):
     def calc_specific_heat_capacity(self, T):
         """specific heat capacity for pure ice (J/kg/K)
 
-        Specific heat capacity, c, per unit mass of ice in SI units. 
-        Note: c of dry snow and ice does not vary with density 
-        because the heat needed to warm the air and vapor between 
+        Specific heat capacity, c, per unit mass of ice in SI units.
+        Note: c of dry snow and ice does not vary with density
+        because the heat needed to warm the air and vapor between
         grains is neglibible. (see Cuffey, ch 9, pp 400)
 
         c = 152.5 + 7.122(T)
@@ -89,7 +89,7 @@ class Ice(object):
 
         Returns
         -------
-        c: float 
+        c: float
             specific heat capacity of ice in Jkg^-1K^-1
 
         """
@@ -126,19 +126,19 @@ class Ice(object):
 
         Use the density relation for depths from 0-48 m. When the
         the density of pure ice is entered into this equation a thermal
-        conductivity `k_{firn}(p_ice)=2.4` W/mK which is the known 
+        conductivity `k_{firn}(p_ice)=2.4` W/mK which is the known
         thermal conductivity of pure ice at -25 deg C.
 
-        The depth dependant relationship predicts the thermal 
+        The depth dependant relationship predicts the thermal
         conductivity of pure ice for depths around 100-110 m. This is
         consistant with the field-measured depth of the firn-ice
-        transitions. 
+        transitions.
 
         Parameters
         ----------
         x : float
-            density or depth used in calculation. Must correspond to 
-            choice of relationship. 
+            density or depth used in calculation. Must correspond to
+            choice of relationship.
         relationship : str, optional
             must be "density" or "depth", by default "density"
         """
@@ -198,24 +198,24 @@ class IceBlock(Ice):
         thickness of ice block in meters
     dx : float, int
         horizontal (x-coordinate) sampling within ice block (m)
-        determined by diffusion lengthscale 
+        determined by diffusion lengthscale
     dz : float, int
         vertical sampling resolution within ice block (m)
     x : np.array
-        x-coordinates of model domain ranging from 0 at downstream 
-        boundaryto -length at upstream boundary, with spacing of dx. 
-        Unit of meters. This array defines the x coordinates of the 
-        iceblock overwhich to run the model. 
+        x-coordinates of model domain ranging from 0 at downstream
+        boundaryto -length at upstream boundary, with spacing of dx.
+        Unit of meters. This array defines the x coordinates of the
+        iceblock overwhich to run the model.
     z : np.array
-        z-coordinates (verical) of model domain ranging from 0 at the 
-        ice surface to the ice thickness at the base of the ice sheet, 
-        spacing of dz. Unit of meters. This array defines the z 
-        coordinates of the iceblock overwhich to run the crevasse 
-        propagation model. Note that the thermal model will run with a 
-        minimum vertical resolution of 5m to reduce computational costs 
-        (dz>=5m for thermal model). 
+        z-coordinates (verical) of model domain ranging from 0 at the
+        ice surface to the ice thickness at the base of the ice sheet,
+        spacing of dz. Unit of meters. This array defines the z
+        coordinates of the iceblock overwhich to run the crevasse
+        propagation model. Note that the thermal model will run with a
+        minimum vertical resolution of 5m to reduce computational costs
+        (dz>=5m for thermal model).
     length : int, float
-        length of horizontal component of model domain in meters. 
+        length of horizontal component of model domain in meters.
     dt : float, int
         Timestep in seconds to run crevasse model (seconds)
     dt_T : float, int
@@ -225,19 +225,19 @@ class IceBlock(Ice):
     crev_count : int
         Number of crevasses within model domain
     crev_locs : List[Tuple]
-        positional information corresponding to crevasses within 
-        crevasse field. Tuple entries contain the (x-coordinate, depth) 
-        of a crevasse, with the number of list entries equal to the 
+        positional information corresponding to crevasses within
+        crevasse field. Tuple entries contain the (x-coordinate, depth)
+        of a crevasse, with the number of list entries equal to the
         current crevasse count. Values are used by ``ThermalModel`` when
-        solving for ice temperature and refreezing. 
+        solving for ice temperature and refreezing.
     temperature : ThermalModel
-        an instance of ThermalModel populated with model geometry and 
+        an instance of ThermalModel populated with model geometry and
         initial conditions specified when calling ``__init__``
     u_surf : float, optional
         Ice surface velocity within domain (meters per year).
         Defaults to 100 (m/year).
     fracture_toughness : float
-        value to use for fracture toughness of ice (kPa), defaults 
+        value to use for fracture toughness of ice (kPa), defaults
         to value defined in physical_constants.py (0.1 kPa)
     ice_density : float, int
         ice density to use throughout ice block in units of kg/m^3.
@@ -274,17 +274,17 @@ class IceBlock(Ice):
             vertical sampling resolution within ice block (m)
         dt : float, int
             Timestep in days to run crevasse model (days)
-            defaults to 0.5 days. 
+            defaults to 0.5 days.
         crev_spacing : float, int
             Spacing between crevasses in crevasse field (m)
         thermal_freq : float, int
-            Multiple of timestep to run thermal model. 1 would run the 
-            thermal model at every timestep whereas a value of 5 would 
+            Multiple of timestep to run thermal model. 1 would run the
+            thermal model at every timestep whereas a value of 5 would
             run the model after every 5 timesteps. Defaults to 5.
         T_profile : np.array, pd.Series, pd.DataFrame, optional
-            Temperature profile for upstream boundary condition. The 
-            profile will be interpolated to match the thermal model's 
-            vertical resolution. A value for ``T_profile`` is required 
+            Temperature profile for upstream boundary condition. The
+            profile will be interpolated to match the thermal model's
+            vertical resolution. A value for ``T_profile`` is required
             to run ``ThermalModel``.
         T_surface : float, optional
             Ice surface temperature, degrees C. Defaults to 0.
@@ -294,7 +294,7 @@ class IceBlock(Ice):
             Ice surface velocity within domain (meters per year).
             Defaults to 100 (m/year).
         fracture_toughness : float
-            value to use for fracture toughness of ice (kPa), defaults 
+            value to use for fracture toughness of ice (kPa), defaults
             to value defined in ``physical_constants.py`` (0.1 kPa)
         ice_density : float, int
             ice density to use throughout ice block in units of kg/m^3.
@@ -318,8 +318,7 @@ class IceBlock(Ice):
 
         # ice block geometry
         self.length = self.calc_length(u_surf)
-        self.dx = (0.5 * self.length)/round(0.5 * self.length
-                                            / self.diffusion_length())
+        self.dx = self.calc_dx()
         self.x = np.arange(-self.dx-self.length, self.dx, self.dx)
 
         self.ice_thickness = ice_thickness
@@ -348,20 +347,16 @@ class IceBlock(Ice):
 
     #     pass
 
-    def diffusion_length(self):
-        """calculate the horizontal diffusion of heat through ice, m"""
-        return np.sqrt(self.kappa * self.dt_T)
-
     def _init_geometry(self):
         """initialize ice block geometry
 
         Return
         ------
         x : np.array
-            1-D array defining the horizontal (x-direction) 
+            1-D array defining the horizontal (x-direction)
             [-dx - length : dx : 0]
         z : np.array
-            1-D array defining the vertical (z-direction) 
+            1-D array defining the vertical (z-direction)
             [0 : dz : ice_thickness]
 
         """
@@ -369,23 +364,32 @@ class IceBlock(Ice):
         z = np.arange(-self.ice_thickness, self.dz, self.dz)
         return x, z
 
+    def _init_temperatures(self, T_profile, T_surface, T_bed):
+        return None if isinstance(T_profile, type(None)) else ThermalModel(
+            self.ice_thickness, self.length, self.dt_T, self.dz, self.dx,
+            self.crev_locs, T_profile, T_surface, T_bed)
+
     def _thermal_timestep(self, timestep, thermal_freq):
         if round(365 % (timestep*thermal_freq)) != 0:
             raise ValueError(
                 "thermal_freq must divide 365 evenly")
         return round(self.dt * thermal_freq)
 
-    def _init_temperatures(self, T_profile, T_surface, T_bed):
-        return None if isinstance(T_profile, type(None)) else ThermalModel(
-            self.ice_thickness, self.length, self.dt_T, self.dz, self.dx,
-            self.crev_locs, T_profile, T_surface, T_bed)
+    def diffusion_length(self):
+        """diffusion lengthscale for thermal model timestep dt_T"""
+        return np.sqrt(self.kappa * self.dt_T)
+
+    def calc_dx(self):
+        """calculate model dx from diffusion lengthscale"""
+        return (0.5 * self.length)/round(0.5 * self.length
+                                         / self.diffusion_length())
 
     def advect_domain(self):
         """increase domain length to allow crevasses to move downstream
 
-        For the model's timestep `dt` and user-defined ice velocity 
-        `u_surf` allow the 2-D model domain to expand in length by 
-        adding ice at the up-stream boundary. 
+        For the model's timestep `dt` and user-defined ice velocity
+        `u_surf` allow the 2-D model domain to expand in length by
+        adding ice at the up-stream boundary.
 
         `IceBlock` attributes are modified by this function
         `.length` increases by the distance advected in each timestep
@@ -421,22 +425,22 @@ class IceBlock(Ice):
     def calc_length(self, usurf):
         """Calculate initial length of ice block using class init args.
 
-        ice block created to initially have 1 year of ice at the 
-        downstream end of the ice block ahead of the first crevasse's 
+        ice block created to initially have 1 year of ice at the
+        downstream end of the ice block ahead of the first crevasse's
         location. This is specified to keep the crevasse cold. Otherwise
         the downstream boundary condition becomes diffusively influenced
         by the downstream-most crevasse.
 
         condition: if model is run from t=0 and no crevasses exist the
-        ice block length will just be the 1 year of ice ahead of the 
-        first crev. If class initialized for a pre-existing crevasse 
-        field the length depends on the number of crevasses and spacing 
-        of the crevasse field in addition to the one year of ice at the 
+        ice block length will just be the 1 year of ice ahead of the
+        first crev. If class initialized for a pre-existing crevasse
+        field the length depends on the number of crevasses and spacing
+        of the crevasse field in addition to the one year of ice at the
         downstream end.
 
         Parameters
         ----------
-        usurf 
+        usurf
         crev_count
         crev_spacing
 
