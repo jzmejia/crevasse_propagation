@@ -370,7 +370,8 @@ class IceBlock(Ice):
             self.crev_locs, T_profile, T_surface, T_bed,
             thermal_conductivity=self.ki,
             ice_density=self.ice_density,
-            latient_heat_of_freezing_ice=self.Lf
+            latient_heat_of_freezing_ice=self.Lf,
+            thermal_diffusivity=self.kappa
         )
 
     def _thermal_timestep(self, timestep, thermal_freq):
