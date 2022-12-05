@@ -29,6 +29,11 @@ from typing import Union, Tuple
 import matplotlib.pyplot as plt
 
 
+def flatten(nested):
+    """return flatened list"""
+    return [item for elem in nested for item in elem]
+
+
 class ThermalModel():
     """Thermal model used to create IceBlock's temperature field.
 
@@ -110,7 +115,8 @@ class ThermalModel():
         udef=0,
         thermal_conductivity=2.1,
         ice_density=917,
-        latient_heat_of_freezing_ice=3.35e5
+        latient_heat_of_freezing_ice=3.35e5,
+        thermal_diffusivity=1.09e-6
     ):
         """Apply temperature advection and diffusion through ice block.
 
@@ -148,6 +154,7 @@ class ThermalModel():
         self.ice_density = ice_density
         self.ki = thermal_conductivity
         self.Lf = latient_heat_of_freezing_ice
+        self.kappa = thermal_diffusivity
 
         # geometry
         self.length = length
@@ -287,7 +294,7 @@ class ThermalModel():
         sz = self.kappa * self.dt / self.dz ** 2
 
         # Apply crevasse location boundary conditions to A
-        crev_idx = self.find_crev_idx()
+        crev_idx = self.find_crev_idx(nested=False)
 
         # create inversion matrix A
         A = np.eye(self.T.size)
@@ -302,8 +309,16 @@ class ThermalModel():
 
         return A
 
-    def find_crev_idx(self):
+    def find_crev_idx(self, nested=True):
         '''creating a list of matrix indicies for crevasse locations
+
+        Parameters
+        ----------
+        nested : bool
+            return a nested list of crevasse indicies. If True return a
+            nested list such that there is one list of indicies for
+            each crevasse. If False return a flattened list. 
+            Defaults to True.
 
         Returns
         -------
@@ -318,15 +333,16 @@ class ThermalModel():
 
             # find depth indicies for crevasse
             if abs(crev[1]) >= 2*self.dz and abs(crev[1]) < self.ice_thickness:
-                crev_idx.extend(np.arange(
-                    crev_x -
-                    (abs(np.floor(crev[1]/self.dz)) - 1) * self.x.size,
-                    crev_x + self.x.size, self.x.size, dtype=int))
+                idx = np.arange(crev_x - (abs(np.floor(crev[1]/self.dz)) - 1)
+                                * self.x.size, crev_x + self.x.size,
+                                self.x.size, dtype=int).tolist()
             else:
-                crev_idx.extend([crev_x])
+                idx = [crev_x]
+
+            crev_idx.append(idx)
 
         self.crev_idx = crev_idx
-        return crev_idx
+        return crev_idx if nested else flatten(crev_idx)
 
     def calc_temperature(self):
         """Solve for future temp w/ implicit finite difference scheme
@@ -346,7 +362,7 @@ class ThermalModel():
         rhs = self.T.flatten()
 
         # apply boundary conditions
-        rhs[self.crev_idx] = self.T_crev
+        rhs[flatten(self.crev_idx)] = self.T_crev
         rhs[:nx] = self.T_bed
         rhs[-nx:] = self.T_surface
         rhs[np.arange(nx, self.T.size-nx, nx)] = self.T_upglacier[1:-1]
@@ -403,8 +419,52 @@ class ThermalModel():
 
         ind = round(5.6/self.dx)
 
-        if self.x[0] >= min([i[0] for i in self.crevasses]) - 5.6:
+        for num, crev in enumerate(self.crevasses):
+            if self.x[0] >= crev[0]-5.6:
+                Vfrz_upglacier = self.refreezing
 
-            Vfrz = self.dt * (self.ki/self.Lf/self.ice_density) * ()
+        # if self.x[0] >= min([i[0] for i in self.crevasses]) - 5.6:
+            Vfrz_upglacier = self.calc_refreezing(
+                self.T.flatten()[self.crev_idx[num]],
+                self.T.flatten()[[idx - ind for idx in self.crev_idx[num]]])
 
-        pass
+            Vfrz_downglacier = self.calc_refreezing(
+                self.T.flatten()[self.crev_idx[num]],
+                self.T.flatten()[[idx + ind for idx in self.crev_idx[num]]])
+
+        return Vfrz_upglacier, Vfrz_downglacier
+
+    def calc_refreezing(self, T_crevasse, T_depth):
+        """Refreezing rate of meltwater at crevasse wall calculation
+
+        The refreezing rate of meltwater Vfrz(z) can be approximated
+        as follows:
+
+        V_frz(z)/dt = ki/(Lf*rho_i)  [dT_L(x,z)/dx + dT_R(x,z)/dx]
+
+        where
+        ki is the thermal conductivity of ice
+        Lf is the latent heat of freezing
+        dt thermal model timestep
+        TL and TR are the temperatures at the left and right crevasse
+            walls respectively
+        dx = the diffusion length over a year (~5 meters)
+
+
+        Parameters
+        ----------
+        T_crevasse : np.array
+            Ice temperatures along crevasse wall
+        T_depth : np.array
+            Temperatures ~5.6m into the ice (horizontally) from crevasse
+            walls. 5.6 meters is the diffusive lengthscale for one year
+
+        Returns
+        -------
+        : np.array
+            refrozen layer thickness in meters along crevasse walls for 
+            thermal model timestep dt
+
+        """
+        return self.dt * (self.ki/self.Lf/self.ice_density) * (
+            T_crevasse - T_depth) / (round*(5.6/self.dx)*self.dx)
