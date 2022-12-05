@@ -28,10 +28,8 @@ import numpy as np
 from typing import Union, Tuple
 import matplotlib.pyplot as plt
 
-from .iceblock import Ice
 
-
-class ThermalModel(Ice):
+class ThermalModel():
     """Thermal model used to create IceBlock's temperature field.
 
     Notes
@@ -86,8 +84,15 @@ class ThermalModel(Ice):
         ice temperature in deg C.
     T_crev : float, int
         Temperature at crevasse walls in deg C.
-    solver : str
-        type of solver to use, defaults to ``explicit``
+    Lf : float
+        Latient heat of freezing for ice in kJ/kg
+    ki : float
+        Thermal conductivity of ice in W/m/K
+    ice_density : float, int
+        Ice density in kg/m^3
+        NOTE: future versions will allow for depth dependant densities
+        for ice and snow/firn. Upon implementation accepted dtypes will
+        include np.array objects or pd.DataFrame/pd.Series objects. 
     """
 
     def __init__(
@@ -102,7 +107,10 @@ class ThermalModel(Ice):
         T_surface=None,
         T_bed=None,
         # solver=None,
-        udef=0
+        udef=0,
+        thermal_conductivity=2.1,
+        ice_density=917,
+        latient_heat_of_freezing_ice=3.35e5
     ):
         """Apply temperature advection and diffusion through ice block.
 
@@ -128,7 +136,19 @@ class ThermalModel(Ice):
         udef : deformation velocity, defaults to 0 m/a
             Will be able to assign an array for variable deformation
             velocity with depth but this is not yet supported.
+        ice_density : optional, float
+            ice density in kg/m^3. Defaults to 917 kg/m^3
+        thermal_conductivity : optional, float
+            thermal conductivity of ice in W/m/K. Defaults to 2.1
+        latient_heat_of_freezing_ice : optional, float
+            latient heat of freezing for ice in kJ/kg. 
+            Defaults to 3.35e5. 
         """
+        # define constants consistant with IceBlock
+        self.ice_density = ice_density
+        self.ki = thermal_conductivity
+        self.Lf = latient_heat_of_freezing_ice
+
         # geometry
         self.length = length
         self.ice_thickness = ice_thickness
@@ -155,6 +175,7 @@ class ThermalModel(Ice):
         self.T_crev = 0
 
         # initialize temperatures used for leap-frog advection
+        # values only used in calculations, no need to allow user access
         self.T0 = None
         self.Tnm1 = None
 
@@ -162,8 +183,9 @@ class ThermalModel(Ice):
         # needs to be added at some point
         # For sovler to consider vertical ice velocity need ablation
 
+        # crevasse info
         self.crevasses = crevasses
-        self.crev
+        # self.crev
         self.crev_idx = self.find_crev_idx()
 
     def _diffusion_lengthscale(self):
@@ -295,7 +317,7 @@ class ThermalModel(Ice):
                 abs(round(crev[0]/self.dx))
 
             # find depth indicies for crevasse
-            if crev[1] >= 2*self.dz and crev[1] < self.ice_thickness:
+            if abs(crev[1]) >= 2*self.dz and abs(crev[1]) < self.ice_thickness:
                 crev_idx.extend(np.arange(
                     crev_x -
                     (abs(np.floor(crev[1]/self.dz)) - 1) * self.x.size,
