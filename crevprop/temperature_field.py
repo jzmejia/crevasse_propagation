@@ -321,7 +321,7 @@ class ThermalModel():
                 crev_idx.extend(np.arange(
                     crev_x -
                     (abs(np.floor(crev[1]/self.dz)) - 1) * self.x.size,
-                    crev_x, self.x.size, dtype=int))
+                    crev_x + self.x.size, self.x.size, dtype=int))
             else:
                 crev_idx.extend([crev_x])
 
