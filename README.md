@@ -1,6 +1,7 @@
 # Crevasse Propagation Model
 [![Documentation Status](https://readthedocs.org/projects/crevasse-propagation/badge/?version=latest)](https://crevasse-propagation.readthedocs.io/en/latest/?badge=latest)
 
+[crevprop documentation](https://crevasse-propagation.readthedocs.io/en/latest/)
 
 
 ## Description
@@ -10,7 +11,7 @@ python implementation by jzmejia Aug 2021 (start)
 
 
 ## Important
-This model is currently under construction and is not ready for public use.  We can not guarantee the validity of any model outputs at this time.
+This model is currently under development and is not ready for public use.  Module is currently unstable and we can not guarantee the validity of results or functionality until version 1 release scheduled for early 2023. 
 
 
 
@@ -36,7 +37,7 @@ This model is currently under construction and is not ready for public use.  We 
 
 
 
-### Notation used in the literature
+### Comparison with notation used in the literature
 
 | parameter                       |    1964    |       1983        |    1996     | van der veen  | matlab |   poinar    |
 | ------------------------------- | :--------: | :---------------: | :---------: | :-----------: | ------ | :---------: |
