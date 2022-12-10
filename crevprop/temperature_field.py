@@ -368,7 +368,7 @@ class ThermalModel():
         rhs[np.arange(nx, self.T.size-nx, nx)] = self.T_upglacier[1:-1]
         rhs[np.arange(2*nx-1, self.T.size-nx, nx)] = self.T_downglacier[1:-1]
 
-        # add source term near crevasses
+        # add latent heat source term near crevasses
         # upstream of crevasse
         # rhs[crev_idx - 1] = rhs[crev_idx -1] + (Lf/B * virtualblue[])/dx
 
@@ -380,7 +380,7 @@ class ThermalModel():
         return T.reshape(self.T.shape)
 
     def refreezing(self):
-        """Find refrozen layer thickness at crevasse walls
+        """Find refrozen layer thickness at crevasse walls in meters.
 
         The refreezing rate of meltwater depends on the horizontal
         temperature gradient in the ice of the crevasse walls dT/dx
@@ -396,13 +396,6 @@ class ThermalModel():
         TL and TR are the temperatures at the left and right crevasse
             walls respectively
         dx = the diffusion length over a year (~5 meters)
-
-        Requirements: 
-            crev_index
-
-        Updates: 
-
-
         """
         # calculate refreezing for each crevasse
 
@@ -420,22 +413,27 @@ class ThermalModel():
         ind = round(5.6/self.dx)
 
         for num, crev in enumerate(self.crevasses):
-            if self.x[0] >= crev[0]-5.6:
-                Vfrz_upglacier = self.refreezing
 
-        # if self.x[0] >= min([i[0] for i in self.crevasses]) - 5.6:
-            Vfrz_upglacier = self.calc_refreezing(
-                self.T.flatten()[self.crev_idx[num]],
-                self.T.flatten()[[idx - ind for idx in self.crev_idx[num]]])
+            T_down = self.T.flatten()[[x + ind for x in self.crev_idx[num]]]
 
-            Vfrz_downglacier = self.calc_refreezing(
-                self.T.flatten()[self.crev_idx[num]],
-                self.T.flatten()[[idx + ind for idx in self.crev_idx[num]]])
+            # use downglacier temperatures if domain is too small
+            T_up = self.T.flatten()[[x - ind for x in self.crev_idx[num]]
+                                    ] if self.x[0] >= crev[0]-5.6 else T_down
 
-        return Vfrz_upglacier, Vfrz_downglacier
+            # unsure if used?
+            bluelayer_left = self.calc_refreezing(
+                self.T.flatten()[self.crev_idx[num]], T_up)
+            bluelayer_right = self.calc_refreezing(
+                self.T.flatten()[self.crev_idx[num]], T_down)
 
-    def calc_refreezing(self, T_crevasse, T_depth):
-        """Refreezing rate of meltwater at crevasse wall calculation
+            # virtual blue = difference from T=0C (water temperature)
+            virtualblue_left = self.calc_refreezing(T_up, 0)
+            virtualblue_right = self.calc_refreezing(0, T_down)
+
+        return
+
+    def calc_refreezing(self, T_crevasse, T_depth, prevent_negatives=True):
+        """Refreezing layer thickness at crevasse wall in meters.
 
         The refreezing rate of meltwater Vfrz(z) can be approximated
         as follows:
@@ -450,6 +448,8 @@ class ThermalModel():
             walls respectively
         dx = the diffusion length over a year (~5 meters)
 
+        NOTE: refrozen layer thickness set to 0 if calculation yields a 
+        negative value. 
 
         Parameters
         ----------
@@ -461,10 +461,16 @@ class ThermalModel():
 
         Returns
         -------
-        : np.array
+        bluelayer : np.array
             refrozen layer thickness in meters along crevasse walls for 
             thermal model timestep dt
 
         """
-        return self.dt * (self.ki/self.Lf/self.ice_density) * (
+        bluelayer = self.dt * (self.ki/self.Lf/self.ice_density) * (
             T_crevasse - T_depth) / (round*(5.6/self.dx)*self.dx)
+
+        # set to zero if any values are negative
+        if prevent_negatives:
+            np.place(bluelayer, bluelayer < 0, 0)
+
+        return bluelayer
