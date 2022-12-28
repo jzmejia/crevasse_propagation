@@ -25,19 +25,15 @@ ib = IceBlock(500, 1, dt=0.5, thermal_freq=2)
 
 ```
 
-
 ## Important
+
 This model is currently under development and is not ready for public use.  Module is currently unstable and we can not guarantee the validity of results or functionality until version 1 release scheduled for early 2023. 
 
 ## Model Overview
 
-
-
-
-
-
 ### Model Parameters
-Note: This content will be moved to the documentation and removed from the README. 
+
+Note: This content will be moved to the documentation and removed from the `README.md`.
 
 Model parameters to navigate the equations used in `crevasse_propagation` within relevant literature (e.g., Poinar et al., 2017; Van der Veen 2007; Weertman 1964, 1983, 1996).
 

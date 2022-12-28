@@ -401,8 +401,8 @@ class IceBlock(Ice):
         `.x` will reflect new domain length [-length,dx,0]
         """
 
-        # TODO! because xadvect can be smaller than dx, calculate di based
-        # on cumulative timestep counter n, and subtract added, the
+        # TODO! because xadvect can be smaller than dx, calculate di
+        # from cumulative timestep counter n, and subtract added, the
         # tracker of how much the domain has grown over model run
         # added will need to be initalized before this
         # n will need to be initialized outside or given to function
@@ -425,6 +425,26 @@ class IceBlock(Ice):
         pass
 
     def stress_field(self):
+        """define stress field based on model geometry
+
+        stress field = sin wave with an amplitude matching
+        Rxx and a wavelength matching crevasse field length
+
+        a separate function will determine position within stress
+        field as model progresses (i.e., you will need to know the 
+        stresses at each crevasse location based on where they fall
+        within the stress field defined here.) Potentially move to 
+        crevasse field (or calculated here and then input to crevasse 
+        field class)
+
+        sigma_T = sigma_T0 * sin(-pi/ (wps * x))
+        where 
+        sigma_T = defines the stress sigma_T for all x in model domain
+        sigma_T0 = maximum tensile stress within stress field (Rxx)
+        wps = width of positive strain area (half wave length)
+        x = x-vector of model/iceblock 
+
+        """
         pass
 
     def calc_length(self, usurf):
