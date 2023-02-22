@@ -1,16 +1,56 @@
 """Crevasse """
+import math as math
 
-from numpy.lib.function_base import diff
-from .physical_constants import DENSITY_ICE, DENSITY_WATER, POISSONS_RATIO
 import numpy as np
+from numpy.lib.function_base import diff
 from numpy import sqrt, abs
 from numpy.polynomial import Polynomial as P
-import math as math
 from scipy.constants import g, pi
+
+from .physical_constants import DENSITY_ICE, DENSITY_WATER, POISSONS_RATIO
 
 
 class Crevasse:
-    """Class describing a single crevasse
+    """Crevasse formed considering elastic, creep, and refreezing
+
+
+
+    1. Find crack geometry and shape given water input (R, b, Nyrs) and
+       background stress (sigmaT: + compression, - tensile) and physical
+       constants (poissons ratio, shear modulus)
+
+    Takes into account
+    1. Elastic opening (based on Krawczynski 2009)
+    2. Viscous closure (based on Lilien Elmer results)
+    3. Refreezing rate (diffusion and temperature gradient at sidewalls)
+
+    D10 - crevasse position on left
+    D20 - crevasse position on right
+    y0 - z (vertical)
+    dw0 - water depth
+    Z0 - crevasse depth that the elastic module has suggested - we will 
+            integrate on this value to refine it
+
+    KIC - stress intensity factor
+    kk - crevasse counter =- for plotting
+    PFAaccessed - for firn aquifer (Qin) fractured to depth
+            have reached the aquifer depth? bool - prints info is the only use here
+    n - time step for printing info
+    dtScale - how much bigger is the time steps for the thermal model
+
+    Returns
+    -------
+        Z - interval used in interval splitting to test different crevasse depths.
+            comes out of elastic equation if elastic is the only force acting
+            during fracture. 
+                Z will be larger than Ztrue or correct - rename to Z_elastic for similar
+                since it is only taking into consideration elastic fracture mechanism
+        Ztrue - final depth - rename
+        dw - water depth
+        D - mean of d1 and d2
+        D1 - left crevasse profile against zgrid
+        D2 - right crevasse profile against zgrid
+        Fdiff1 - freezing component of change in volume/profile
     """
 
     def __init__(self, Qin):
@@ -28,12 +68,18 @@ class Crevasse:
 
         # forcing
         self.Qin = Qin
+        self.Vmelt = 0
+        self.water_depth = self.depth - self.calc_water_height()
+        self.Vwater = 0
+        self.Vfrz = 0
 
         # creasse geometry
         self.D = None
+        self.Vcrev = 0
 
-        # water
-        self.water_depth = self.depth - self.calc_water_height()
+        # optional
+        self.includeCreep = False
+        self.closed = False
 
     def F(self, use_approximation=False):
         """Finite ice thickness correction for stress intensity factor
@@ -112,7 +158,7 @@ class Crevasse:
                       ) * self.Rxx * sqrt(pi * self.depth)
 
     def calc_water_height(self):
-        """calc water high in crevasse using van der Veen 2007
+        """calc water high in crevasse using Hooke text book formulation
 
         van der Veen 1998/2007 equation to estimate the net stress
         intensity factor (KI) for mode I crack opening where::
@@ -164,7 +210,7 @@ class Crevasse:
             (
                 self.fracture_toughness
                 - self.tensile_stress(self.Rxx, self.depth, self.ice_thickness)
-                + 0.683 * self.ice_density * g * sqrt(pi) * self.depth ** 1.5
+                + 0.683 * self.ice_density * g * sqrt(pi) * (self.depth ** 1.5)
             )
             / (0.683 * DENSITY_WATER * g * sqrt(pi))
         ) ** (2 / 3)
@@ -220,6 +266,42 @@ class Crevasse:
                            self.depth**2 - self.water_depth**2)**(.5)) / pi
                        )
         return sigma_A
+
+    def crev_morph(self):
+        """geometry solver
+        """
+        pass
+
+    def crevasse_volume(self, z, water_depth, Dleft, Dright):
+        """calculate volume of water filled crevasse
+
+        Parameters
+        ----------
+            z : np.array
+                vertical spacing/coordinates corresponding to crevasse 
+                wall profiles Dleft and Dright
+            water_depth : float
+                water depth in crevasse
+            Dleft : np.array
+                profile of left crevasse wall
+            Dright : np.array
+                profile of crevasse walls
+
+        Returns
+        -------
+            V : crevasse volume
+
+
+        NOTE: Adapted from Poinar Matlab Script using matlab's `trapz`
+        function. An important difference is that in matlab `trapz(X,Y)`
+        for integration using two variables but for the `numpy.trapz()`
+        function used here, this is inverted such that `np.trapz(Y,X)`.
+
+        """
+        # find index of water depth and only consider that in calc.
+
+        V = np.abs(np.trapz(Dleft, z)) + np.abs(np.trapz(Dright, z))
+        pass
 
 
 def alpha(dislocation_type="edge", crack_opening_mode=None):
