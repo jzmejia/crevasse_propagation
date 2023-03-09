@@ -1,5 +1,23 @@
 """
 fracture mechanics used in crevasse propagation model
+
+Linear elastic fracture mechanics scheme for crevasse propagation
+
+
+LEFM based on Weertman's dislocation theory and application to crevasses
+with adaptations from van der Veen (1998)
+
+
+Theory
+------
+STRESS INTENSITY FACTOR
+For a fracture to propagate
+       KI >= KIC
+stress @ crev tip must >= fracture toughness of ice
+where KI is the stress intensity factor
+which describes the stresses at the fracture's tip
+the material's fracture toughness (KIC)
+
 """
 from numpy.lib.function_base import diff
 from .physical_constants import DENSITY_ICE, DENSITY_WATER, FRACTURE_TOUGHNESS, POISSONS_RATIO
@@ -8,14 +26,6 @@ from numpy import sqrt, abs
 from numpy.polynomial import Polynomial as P
 import math as math
 from scipy.constants import g, pi
-
-# STRESS INTENSITY FACTOR
-# For a fracture to propagate
-#        KI >= KIC
-# stress @ crev tip must >= fracture toughness of ice
-# where KI is the stress intensity factor
-# which describes the stresses at the fracture's tip
-# the material's fracture toughness (KIC)
 
 
 def F(crevasse_depth, ice_thickness, use_approximation=False):
