@@ -68,7 +68,7 @@ def F(crevasse_depth, ice_thickness, use_approximation=False):
 
 
 def tensile_stress(Rxx, crevasse_depth, ice_thickness):
-    """Calculate the stress intensity factor's tensile compoent.
+    """Calculate the stress intensity factor's tensile component.
 
     An approximatioin of the polynomial coefficient can be 
     used if the ratio between ``crevasse_depth`` and ``ice_thickness``

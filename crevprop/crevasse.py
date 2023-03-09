@@ -154,7 +154,6 @@ class Crevasse:
         """
         self.z = z
         self.dz = z
-        self.dy = 0.01  # vertical spacing to use for shallow crevasses
         self.ice_thickness = ice_thickness
 
         self.fracture_toughness = fracture_toughness
@@ -196,6 +195,36 @@ class Crevasse:
 
     # three crevasse processes considered here
 
+    def evolve(self, Qin, sigmaCrev):
+        """evolve crevasse for new timestep and inputs"""
+        # required initializations/adjustments
+
+        setattr(self, 'sigmaCrev', sigmaCrev)
+        crevasse_depth = max(self.depth, 0.1)
+        dz = 1
+        dy = 0.01  # z spacing resolution to use if crevasse is shallow
+
+        Vwater = Qin
+        Vcrev = 1e-15  # init crev volume to something very small
+
+        # 1. determine if the crevasse will grow in this timestep
+        #    crevasse will grow if Qin (water input/volume) > crevasse volume
+
+        # conditionals: did the crevasse creep or freeze closed?
+
+        # Begin loop on matching Vwater = Vcrevase (solving for the crevasse
+        # volume required to support the input water)
+        # change crevasse volume to something very small
+
+        # loop depends on tolerance values
+        while abs(Vwater-Vcrev)/Vwater > self.voltol & dz > self.ztol:
+
+            y = np.arange(-crevasse_depth, dy, dy)
+
+            water_depth = self.calc_water_height(crevasse_depth)
+
+        pass
+
     def elastic_opening(self):
         """Linear elastic fracture mechanics for crevasse opening
 
@@ -203,6 +232,9 @@ class Crevasse:
 
 
         """
+
+        #
+        dy = 0.01  # vertical spacing to use for shallow crevasses
 
         pass
 
@@ -252,7 +284,7 @@ class Crevasse:
         p = P([1.12, -0.23, 10.55, -21.72, 30.39])
         return 1.12 if use_approximation else p(self.depth / self.ice_thickness)
 
-    def tensile_stress(self):
+    def tensile_stress(self, crevasse_depth):
         """calculate tensile stress
 
         LEFM
@@ -282,7 +314,7 @@ class Crevasse:
         Parameters
         ----------
         Rxx : 
-            far-field stress or tensile resistive stress
+            tensile resistive stress in Pa
         crevasse_depth : float
             crevasse depth below ice surface in m
         ice_thickness : float
@@ -292,10 +324,10 @@ class Crevasse:
         -------
             stress intensity factor's tensile component
         """
-        return self.F(self.depth, self.ice_thickness
-                      ) * self.Rxx * sqrt(pi * self.depth)
+        return self.F(crevasse_depth, self.ice_thickness
+                      ) * self.Rxx * sqrt(pi * crevasse_depth)
 
-    def calc_water_height(self):
+    def calc_water_height(self, crevasse_depth, ):
         """calc water high in crevasse using Hooke text book formulation
 
         LEFM
@@ -349,8 +381,10 @@ class Crevasse:
         return (
             (
                 self.fracture_toughness
-                - self.tensile_stress(self.Rxx, self.depth, self.ice_thickness)
-                + 0.683 * self.ice_density * g * sqrt(pi) * (self.depth ** 1.5)
+                - self.tensile_stress(self.Rxx,
+                                      crevasse_depth, self.ice_thickness)
+                + 0.683 * self.ice_density * g *
+                sqrt(pi) * (crevasse_depth ** 1.5)
             )
             / (0.683 * DENSITY_WATER * g * sqrt(pi))
         ) ** (2 / 3)
@@ -450,7 +484,7 @@ class Crevasse:
             z : np.array
                 vertical spacing/coordinates corresponding to crevasse 
                 wall profiles Dleft and Dright
-            water_depth : float
+            water_depth : float, int
                 water depth in crevasse
             Dleft : np.array
                 profile of left crevasse wall
@@ -459,7 +493,8 @@ class Crevasse:
 
         Returns
         -------
-            V : crevasse volume
+            volume : float
+                two-dimensional crevasse volume in square meters
 
 
         NOTE: Adapted from Poinar Matlab Script using matlab's `trapz`
@@ -469,9 +504,11 @@ class Crevasse:
 
         """
         # find index of water depth and only consider that in calc.
+        idx = np.abs(z+water_depth).argmin()+1
 
-        V = np.abs(np.trapz(Dleft, z)) + np.abs(np.trapz(Dright, z))
-        pass
+        volume = np.abs(np.trapz(Dleft[:idx], z[:idx])) \
+            + np.abs(np.trapz(Dright[:idx], z[:idx]))
+        return volume
 
 
 def calc_alpha(edge_dislocation=True, mode=1):
