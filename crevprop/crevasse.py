@@ -196,10 +196,60 @@ class Crevasse:
     # three crevasse processes considered here
 
     def evolve(self, Qin, sigmaCrev):
-        """evolve crevasse for new timestep and inputs"""
+        """evolve crevasse for new timestep and inputs
+
+        this function allows the crevasse's shape to evolve in response
+        to water inputs and changing applied stress on the crevasse.
+
+
+        Parameters
+        ----------
+        Qin : float
+            volume of water input to crevasse during a timestep of model
+            units of m^2
+        sigmaCrev : float
+            applied stress on crevasse in Pa
+
+
+        Returns
+        -------
+
+        """
+        setattr(self, 'sigmaCrev', sigmaCrev)
+        Vwater = Qin
+
+        if Vwater > 1e-4 & self.depth < (self.ice_thickness - 10):
+            self.crevmorph(Qin)
+
+        elif self.depth >= (self.ice_thickness - 10):
+            # do nothing fracture mechanics related but set water level
+            # to floation to best approximate a moulin
+            dw = (1-DENSITY_ICE/DENSITY_WATER)*self.depth
+            setattr(self, 'FTHF', True)
+
+            # calculate Vfrz for this timestep
+        else:
+            # there is no water to fill the crevasse
+            dw = 0
+
+            # if old crevasse calculate elastic closure of surface ditch
+            # e.g., englacial void near ice surface
+            # artificially assign a "depth" of crevasse to highest place
+            # where wall profile > 0
+
+        pass
+
+    def crevmorph(self, Qin):
+        """
+        find crevasse shape givin water input and background stress
+
+
+        this function adds elastic opening, creep closure, and 
+        refreezing to make a crevasse. For a given 
+
+        """
         # required initializations/adjustments
 
-        setattr(self, 'sigmaCrev', sigmaCrev)
         crevasse_depth = max(self.depth, 0.1)
         dz = 1
         dy = 0.01  # z spacing resolution to use if crevasse is shallow
@@ -349,8 +399,7 @@ class Crevasse:
             + 0.683 * ice_density * g * ice_thickness**1.5)
             / 0.683 * water_density * g )**2/3
 
-        **Assumptions**: Rxx constant with depth, 
-        sdoesn't account for firn
+        **Assumptions**: Rxx constant w/ depth, doesn't account for firn
 
         Note
         ----
@@ -405,17 +454,17 @@ class Crevasse:
         ----------
         z : _type_
             _description_
-        sigma_T : _type_
-            _description_
+        sigma_T : float
+            tensile stress
         alpha : tuple, optional
             _description_, by default (1-POISSONS_RATIO)
         has_water : bool, optional
-            _description_, by default True
+            does the crevasse have any water in it? by default True
 
         Returns
         -------
-        _type_
-            _description_
+        D : np.ndarray
+            crevasse wall displacement (funtion of depth)
         """
 
         # define D and alpha for a water-free crevasse
