@@ -39,7 +39,7 @@ class Ice(object):
     def __init__(self,
                  ice_density=917.,
                  ice_temperature=0,
-                 fracture_toughness=10e3):
+                 fracture_toughness=100e3):
         """_summary_
 
         Parameters
@@ -49,7 +49,7 @@ class Ice(object):
         temperature : int, optional
             ice temperature in degrees Celsius, by default 0C
         fracture_toughness : float, optional
-            fracture toughness of ice, by default 10e3
+            fracture toughness of ice in Pa, by default 0.1 MPa
         """
 
         self.ice_density = ice_density
@@ -262,8 +262,8 @@ class IceBlock(Ice):
         T_surface=None,
         T_bed=None,
         u_surf=100.,
-        fracture_toughness=10e3,
-        ice_density=917
+        fracture_toughness=None,
+        ice_density=None
     ):
         """
         Parameters
@@ -294,8 +294,8 @@ class IceBlock(Ice):
             Ice surface velocity within domain (meters per year).
             Defaults to 100 (m/year).
         fracture_toughness : float
-            value to use for fracture toughness of ice (kPa), defaults
-            to value defined in ``physical_constants.py`` (0.1 kPa)
+            value to use for fracture toughness of ice (Pa), defaults
+            to 0.1 MPa. 
         ice_density : float, int
             ice density to use throughout ice block in units of kg/m^3.
             Defaults to value set in physical_constants.py (917 kg/m^3)
