@@ -54,6 +54,7 @@ class CrevasseField:
                  length,
                  fracture_toughness,
                  crev_spacing,
+                 sigmaT=120e3,
                  crev_count=None,
                  crev_locs=None,
                  ):
@@ -70,11 +71,12 @@ class CrevasseField:
         self.crev_spacing = crev_spacing
         self.crev_count = crev_count if crev_count else 1
 
-        self.fracture_toughness = 100e3  # Pa m^0.5 fracture toughness of ice
+        # Pa m^0.5 fracture toughness of ice
+        self.fracture_toughness = fracture_toughness
         self.ice_softness = 1e8  # how soft is the ice
 
         # maximum tensile stress (xx) const, amp of stress field that ice mass gets advected through
-        self.sigmaT0 = 120e3  # far-field tensile stress
+        self.sigmaT0 = sigmaT  # far-field tensile stress
         self.sigmaCrev = 0  # changes sigma on each crev
         self.wps = 3e3  # width of positive strain area half-wavelength (m)
 
@@ -137,7 +139,7 @@ class Crevasse:
                  ice_softness,
                  sigmaCrev,
                  ice_density=917,
-                 fracture_toughness=10e3,
+                 fracture_toughness=100e3,
                  include_creep=True,
                  never_closed=False
                  ):
@@ -175,6 +177,7 @@ class Crevasse:
         self.water_depth = 0
         # height = height of water above crevasse tip
         self.water_height = 0
+        self.flotation_depth = (1-self.ice_density/1000) * self.ice_thickness
 
         # self.water_depth = self.depth - self.calc_water_height()
 
@@ -313,8 +316,10 @@ class Crevasse:
     # everything below are class methods added from fracture.py
     # NOTE: all describe linear elastic fracture mechanics
 
-    def elastic_displacement(self, z, sigma_T,
-                             alpha=(1-POISSONS_RATIO),
+    def elastic_displacement(self,
+                             z,
+                             water_depth,
+                             crevasse_depth,
                              has_water=True
                              ):
         """elastic crevasse wall displacement from applied stress sigmaT.
@@ -327,12 +332,12 @@ class Crevasse:
 
         Parameters
         ----------
-        z : _type_
-            _description_
-        sigma_T : float
-            tensile stress
-        alpha : tuple, optional
-            _description_, by default (1-POISSONS_RATIO)
+        z : np.array
+            depth array to find crevasse wall locations along
+        water_depth : float
+            depth from ice surface to water in crevasse in meters
+        crevasse_depth : float
+            depth of crevasse in m
         has_water : bool, optional
             does the crevasse have any water in it? by default True
 
@@ -343,46 +348,47 @@ class Crevasse:
         """
 
         # define D and alpha for a water-free crevasse
-        sigma_A = self.applied_stress(sigma_T, self.depth,
-                                      self.water_depth, has_water=has_water)
+        sigma_A = self.applied_stress(self.sigma_T, crevasse_depth,
+                                      water_depth, has_water=has_water)
 
         # define constant to advoid repeated terms in D equation
-        c1 = (2*alpha)/(self.mu*pi)
+        c1 = (2*self.alpha)/(self.mu*pi)
 
         # Wall displacement D(z) for a water-free crevasse
-        D = (c1*pi*sigma_A * diff_squares(self.depth, z)
-             + c1*DENSITY_ICE*g*self.depth*diff_squares(self.depth, z)
-             - c1*DENSITY_ICE * g * z ** 2 * 0.5 *
-             np.log(sum_over_diff(self.depth, diff_squares(self.depth, z)))
+        D = (c1*pi*sigma_A * diff_squares(crevasse_depth, z)
+             + c1*self.ice_density*g*crevasse_depth *
+             diff_squares(crevasse_depth, z)
+             - c1*self.ice_density * g * z ** 2 * 0.5 *
+             np.log(sum_over_diff(crevasse_depth, diff_squares(crevasse_depth, z)))
              )
 
         # Add 4 extra terms to D(z) for the addition of water to crevasse
         if has_water:
             c1 = c1 * DENSITY_WATER * g
             D = (D
-                 - c1 * diff_squares(self.depth, self.water_depth) *
-                 diff_squares(self.depth, z)
-                 + (c1 * (z**2 - self.water_depth**2) * 0.5 * np.log(abs(
-                     sum_over_diff(diff_squares(self.depth, self.water_depth),
-                                   diff_squares(self.depth, z)))))
-                 - c1 * self.water_depth * z * np.log(abs(
-                     sum_over_diff(self.water_depth * diff_squares(self.depth, z),
-                                   z * diff_squares(self.depth, self.water_depth))))
-                 + c1 * self.water_depth**2 * np.log(abs(
-                     sum_over_diff(diff_squares(self.depth, z),
-                                   diff_squares(self.depth, self.water_depth))))
+                 - c1 * diff_squares(crevasse_depth, water_depth) *
+                 diff_squares(crevasse_depth, z)
+                 + (c1 * (z**2 - water_depth**2) * 0.5 * np.log(abs(
+                     sum_over_diff(diff_squares(crevasse_depth, water_depth),
+                                   diff_squares(crevasse_depth, z)))))
+                 - c1 * water_depth * z * np.log(abs(
+                     sum_over_diff(water_depth * diff_squares(crevasse_depth, z),
+                                   z * diff_squares(crevasse_depth, water_depth))))
+                 + c1 * water_depth**2 * np.log(abs(
+                     sum_over_diff(diff_squares(crevasse_depth, z),
+                                   diff_squares(crevasse_depth, water_depth))))
                  )
         return abs(D)
 
-    def applied_stress(self, sigma_T, crev_depth, water_depth, has_water=True):
-        sigma_A = sigma_T - (2 * DENSITY_ICE * g * crev_depth)/pi
+    def applied_stress(self, sigma_T, crevasse_depth, water_depth, has_water=True):
+        sigma_A = sigma_T - (2 * self.ice_density * g * crevasse_depth)/pi
         if has_water or water_depth:
             sigma_A = (sigma_A
                        - DENSITY_WATER * g * water_depth
                        + (2/pi) * DENSITY_WATER * g * water_depth *
-                       np.arcsin(water_depth/crev_depth)
+                       np.arcsin(water_depth/crevasse_depth)
                        + (2 * DENSITY_WATER * g * (
-                           crev_depth**2 - water_depth**2)**(.5)) / pi
+                           crevasse_depth**2 - water_depth**2)**(.5)) / pi
                        )
         return sigma_A
 
