@@ -167,7 +167,6 @@ class Crevasse:
 
         self.depth = 0.1
         self.volume = 1e-4
-
         # water-filled crevasse
         self.Qin = Qin
         self.Vmelt = 0
@@ -189,6 +188,8 @@ class Crevasse:
 
         # crevasse wall displacement D(z)
         self.walls = np.zeros(len(self.z))
+        self.left_wall = -self.walls
+        self.right_wall = self.walls
 
         # optional
         self.include_creep = include_creep
@@ -271,9 +272,15 @@ class Crevasse:
         Z_elastic = max(self.depth, 0.1)
         dz = 1
         dy = 0.01  # z spacing resolution to use if crevasse is shallow
+        y = np.around(np.arange(-Z_elastic, dy, dy), decimals=2)
 
         Vwater = Qin
         Vcrev = 1e-15  # init crev volume to something very small
+
+        # current crevasse wall locations, redefining incase i need to
+        # change data temporarily for calculations
+        Dleft0 = np.interp(y, self.z, self.left_wall)
+        Dright0 = np.interp(y, self.z, self.right_wall)
 
         # 1. determine if the crevasse will grow in this timestep
         #    crevasse will grow if Qin (water input/volume) > crevasse volume
@@ -287,30 +294,44 @@ class Crevasse:
         # loop depends on tolerance values
         while abs(Vwater-Vcrev)/Vwater > self.voltol & dz > self.ztol:
 
-            y = np.arange(-Z_elastic, dy, dy)
-
             # 1. assign water depth so that KI=KIC
             water_depth = self.calc_water_depth(Z_elastic)
 
-        pass
+            # elastic crack geometry
+            # right now filling with nans outside of crev size, do i
+            # want to do this if i have to subtract or set to zero then
+            # nan later for plotting?
+            E0 = self.elastic_displacement(y, self.water_depth, self.depth)
+            E = self.elastic_displacement(y, water_depth, Z_elastic)
 
-    def elastic_opening(self):
-        """Linear elastic fracture mechanics for crevasse opening
+            # Elastic differential opening
+            EDiff = E - E0
 
+            # Apply elastic opening to crevasse walls
+            Dleft = np.minimum(Dleft0 - EDiff, np.zeros_like(Dleft0))
+            Dright = np.maximum(Dright0 + EDiff, np.zeros_like(Dright0))
 
-
-
-        """
-
-        #
-        dy = 0.01  # vertical spacing to use for shallow crevasses
+            # REFREEZING CONTRIBUTION TO CREVASSE WIDTH
 
         pass
 
     def creep_closing(self):
         pass
 
-    def refreezing(self):
+    def refreezing(self, crevasse_depth, water_depth):
+        """Refreezing contribution to crevasse width
+
+        Parameters
+        ----------
+        virtualblue_left : np.array
+        virtualblue_right : np.array
+        water_depth : float
+        crevasse_depth : float
+
+
+        Returns
+        -------
+        """
         pass
 
     # everything below are class methods added from fracture.py
@@ -355,7 +376,8 @@ class Crevasse:
         # define constant to advoid repeated terms in D equation
         c1 = (2*self.alpha)/(self.mu*pi)
 
-        # take supset of depth array to avoide dividing by zero at crevasse tip
+        # take supset of depth array to avoide dividing by zero at
+        # crevasse tip
         z = Z[Z > -crevasse_depth]
 
         # Wall displacement D(z) for a water-free crevasse
@@ -384,8 +406,8 @@ class Crevasse:
 
         Dz = np.copy(Z)
         Dz[Dz > -crevasse_depth] = abs(D)
-        Dz[-(z.size+1)] = 0
-        Dz[Dz < -crevasse_depth] = np.nan
+        # Dz[-(z.size+1)] = 0
+        Dz[Dz <= -crevasse_depth] = 0  # was np.nan and < only
 
         return Dz
 
