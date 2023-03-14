@@ -317,7 +317,7 @@ class Crevasse:
     # NOTE: all describe linear elastic fracture mechanics
 
     def elastic_displacement(self,
-                             z,
+                             Z,
                              water_depth,
                              crevasse_depth,
                              has_water=True
@@ -332,19 +332,20 @@ class Crevasse:
 
         Parameters
         ----------
-        z : np.array
+        Z : np.array
             depth array to find crevasse wall locations along
         water_depth : float
             depth from ice surface to water in crevasse in meters
         crevasse_depth : float
-            depth of crevasse in m
+            depth of crevasse in m (positive value)
         has_water : bool, optional
             does the crevasse have any water in it? by default True
 
         Returns
         -------
         D : np.ndarray
-            crevasse wall displacement (funtion of depth)
+            crevasse wall displacement for each depth given in Z array
+            units m, values are all positive. 
         """
 
         # define D and alpha for a water-free crevasse
@@ -354,13 +355,15 @@ class Crevasse:
         # define constant to advoid repeated terms in D equation
         c1 = (2*self.alpha)/(self.mu*pi)
 
+        # take supset of depth array to avoide dividing by zero at crevasse tip
+        z = Z[Z > -crevasse_depth]
+
         # Wall displacement D(z) for a water-free crevasse
-        D = (c1*pi*sigma_A * diff_squares(crevasse_depth, z)
-             + c1*self.ice_density*g*crevasse_depth *
-             diff_squares(crevasse_depth, z)
-             - c1*self.ice_density * g * z ** 2 * 0.5 *
-             np.log(sum_over_diff(crevasse_depth, diff_squares(crevasse_depth, z)))
-             )
+        D = (c1 * pi * sigma_A * diff_squares(crevasse_depth, z)
+             + c1 * self.ice_density * g * crevasse_depth * diff_squares(
+                 crevasse_depth, z)
+             - c1 * self.ice_density * g * z ** 2 * 0.5 * np.log(
+                 sum_over_diff(crevasse_depth, diff_squares(crevasse_depth, z))))
 
         # Add 4 extra terms to D(z) for the addition of water to crevasse
         if has_water:
@@ -371,14 +374,20 @@ class Crevasse:
                  + (c1 * (z**2 - water_depth**2) * 0.5 * np.log(abs(
                      sum_over_diff(diff_squares(crevasse_depth, water_depth),
                                    diff_squares(crevasse_depth, z)))))
-                 - c1 * water_depth * z * np.log(abs(
-                     sum_over_diff(water_depth * diff_squares(crevasse_depth, z),
-                                   z * diff_squares(crevasse_depth, water_depth))))
-                 + c1 * water_depth**2 * np.log(abs(
-                     sum_over_diff(diff_squares(crevasse_depth, z),
-                                   diff_squares(crevasse_depth, water_depth))))
+                 - c1 * water_depth * z * np.log(abs(sum_over_diff(
+                     water_depth * diff_squares(crevasse_depth, z),
+                     z * diff_squares(crevasse_depth, water_depth))))
+                 + c1 * water_depth**2 * np.log(abs(sum_over_diff(
+                     diff_squares(crevasse_depth, z),
+                     diff_squares(crevasse_depth, water_depth))))
                  )
-        return abs(D)
+
+        Dz = np.copy(Z)
+        Dz[Dz > -crevasse_depth] = abs(D)
+        Dz[-(z.size+1)] = 0
+        Dz[Dz < -crevasse_depth] = np.nan
+
+        return Dz
 
     def applied_stress(self, sigma_T, crevasse_depth, water_depth, has_water=True):
         sigma_A = sigma_T - (2 * self.ice_density * g * crevasse_depth)/pi
