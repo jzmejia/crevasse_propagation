@@ -75,21 +75,26 @@ class CrevasseField:
         self.fracture_toughness = fracture_toughness
         self.ice_softness = 1e8  # how soft is the ice
 
-        # maximum tensile stress (xx) const, amp of stress field that ice mass gets advected through
+        # maximum tensile stress (xx) const, amp of stress field that
+        # ice mass gets advected through
         self.sigmaT0 = sigmaT  # far-field tensile stress
         self.sigmaCrev = 0  # changes sigma on each crev
-        self.wps = 3e3  # width of positive strain area half-wavelength (m)
+        self.wps = 3e3  # positive strain area width (m) half-wavelength
 
-        # weather to blunt the stresses (sigmaTcrev=0 for interior crevasses) used with creep calc
+        # weather to blunt the stresses
+        # (sigmaTcrev=0 for interior crevasses) used with creep calc
         self.blunt = False
         self.include_creep = True  # use creep model or not
-        # always allow melt in, regardless of near-surface pinching only affects Vin calc
+        # always allow melt in, regardless of near-surface pinching
+        # only affects Vin calc
         self.never_closed = True
 
-        # allow water when longitundinal stress is negative (compressive stress regeime)
-        # don't allow water in to crev if in compressive regeime -- affects Qin calc
+        # allow water when longitundinal stress is negative
+        # (compressive stress regeime)
+        # don't allow water in to crev if in compressive regeime --
+        # affects Qin calc
         self.water_compressive = False
-        self.PFA_depth = 30  # meters penetration required to access perrenial firn aquifer
+        self.PFA_depth = 30  # meters penetration required to access pfa
 
 
 class Crevasse:
@@ -140,7 +145,7 @@ class Crevasse:
                  sigmaCrev,
                  ice_density=917,
                  fracture_toughness=100e3,
-                 include_creep=True,
+                 include_creep=False,
                  never_closed=False
                  ):
         """
@@ -192,7 +197,7 @@ class Crevasse:
         self.right_wall = self.walls
 
         # optional
-        self.include_creep = include_creep
+        self.include_creep = include_creep  # note: reqs data
         self.never_closed = never_closed
         self.closed = False
 
@@ -201,7 +206,7 @@ class Crevasse:
         self.alpha = self.calc_alpha(mode=1)
 
         # tolerance for viscoelastic crevasse extension
-        self.ztol = 1e-3  # meters depth tolerance for viscoelastic crevasse extension
+        self.ztol = 1e-3  # m depth tolerance for
         # volume error fractional ratio (Vwater-Vcrev)/Vwater
         self.voltol = 1e-3
 
@@ -283,11 +288,12 @@ class Crevasse:
         Dright0 = np.interp(y, self.z, self.right_wall)
 
         # 1. determine if the crevasse will grow in this timestep
-        #    crevasse will grow if Qin (water input/volume) > crevasse volume
+        #    crevasse will grow if Qin (water input/volume) > crevasse
+        #    volume
 
         # conditionals: did the crevasse creep or freeze closed?
 
-        # Begin loop on matching Vwater = Vcrevase (solving for the crevasse
+        # Begin loop on matching Vwater = Vcrevase (solving for crevasse
         # volume required to support the input water)
         # change crevasse volume to something very small
 
@@ -312,6 +318,12 @@ class Crevasse:
             Dright = np.maximum(Dright0 + EDiff, np.zeros_like(Dright0))
 
             # REFREEZING CONTRIBUTION TO CREVASSE WIDTH
+
+            # Creep Closure - calculated from data for area
+            if self.creep_closing:
+                CDiff = self.creep_closing()
+            else:
+                CDiff = np.zeros_like(FDiff_left)
 
         pass
 
@@ -343,7 +355,7 @@ class Crevasse:
                              crevasse_depth,
                              has_water=True
                              ):
-        """elastic crevasse wall displacement from applied stress sigmaT.
+        """elastic crevasse wall displacement from applied stress sigmaT
 
 
 
@@ -385,9 +397,10 @@ class Crevasse:
              + c1 * self.ice_density * g * crevasse_depth * diff_squares(
                  crevasse_depth, z)
              - c1 * self.ice_density * g * z ** 2 * 0.5 * np.log(
-                 sum_over_diff(crevasse_depth, diff_squares(crevasse_depth, z))))
+                 sum_over_diff(crevasse_depth,
+                               diff_squares(crevasse_depth, z))))
 
-        # Add 4 extra terms to D(z) for the addition of water to crevasse
+        # Add 4 extra terms to D(z) for water added to crevasse
         if has_water:
             c1 = c1 * DENSITY_WATER * g
             D = (D
@@ -411,7 +424,12 @@ class Crevasse:
 
         return Dz
 
-    def applied_stress(self, sigma_T, crevasse_depth, water_depth, has_water=True):
+    def applied_stress(self,
+                       sigma_T,
+                       crevasse_depth,
+                       water_depth,
+                       has_water=True
+                       ):
         sigma_A = sigma_T - (2 * self.ice_density * g * crevasse_depth)/pi
         if has_water or water_depth:
             sigma_A = (sigma_A
@@ -644,8 +662,8 @@ class Crevasse:
         Parameters
         ----------
         edge_dislocation : bool, optional
-            consider edge dislocaitons only if true, if false consider screw 
-            dislocations, by default True
+            consider edge dislocaitons only if true, if false consider 
+            screw dislocations, by default True
 
         crack_opening_mode : int, str, optional
             mode of crack opening to use, by default 1
@@ -660,7 +678,8 @@ class Crevasse:
         elif not edge_dislocation or mode in [3, 'iii', 'III']:
             alpha = 1 - POISSONS_RATIO
         else:
-            print(f'incorrect function inputs, assuming edge dislocation alpha=1-v')
+            print(f'incorrect function inputs, assuming edge '
+                  'dislocation alpha=1-v')
             alpha = 1 - POISSONS_RATIO
         return alpha
 
@@ -701,23 +720,28 @@ def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
     # D20 - crevasse position on right
     # y0 - z(vertical)
     # dw0 - water depth
-    # Z0 - crevasse depth that the elastic module has suggested - we will
+    # Z0 - crevasse depth that the elastic module has suggested
     #        integrate on this value to refine it
 
     # KIC - stress intensity factor
     # kk - crevasse counter = - for plotting
     # PFAaccessed - for firn aquifer(Qin) fractured to depth
-    #        have reached the aquifer depth? bool - prints info is the only use here
+    #        have reached the aquifer depth? bool - prints info is the
+    #       only use here
     # n - time step for printing info
     # dtScale - how much bigger is the time steps for the thermal model
 
     # Returns
     # -------
-    #    Z - interval used in interval splitting to test different crevasse depths.
-    #        comes out of elastic equation if elastic is the only force acting
+    #    Z - interval used in interval splitting to test different
+    #        crevasse depths.
+    #        comes out of elastic equation if elastic is the only force
+    #        acting
     #         during fracture.
-    #            Z will be larger than Ztrue or correct - rename to Z_elastic for similar
-    #             since it is only taking into consideration elastic fracture mechanism
+    #            Z will be larger than Ztrue or correct - rename to
+    #            Z_elastic for similar
+    #             since it is only taking into consideration elastic
+    #             fracture mechanism
     #     Ztrue - final depth - rename
     #     dw - water depth
     #     D - mean of d1 and d2
