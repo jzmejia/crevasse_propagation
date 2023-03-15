@@ -170,7 +170,8 @@ class Ice(object):
         -------
         thermal diffusivity with units of m^2/s
         """
-        return self.thermal_conductivity / (self.ice_density * self.specific_heat_capacity)
+        return self.thermal_conductivity / (
+            self.ice_density * self.specific_heat_capacity)
 
     def _set_unit(self):
         units = {
@@ -418,7 +419,7 @@ class IceBlock(Ice):
         # track crevasse location (downglacier-most)
 
         # detach domain if necessary
-        # update thermal model upglacier boundary condition if applicable
+        # update thermal model upglacier boundary condition req
 
         # update u and v velocity profiles if applicable
 
@@ -535,7 +536,7 @@ class IceBlock(Ice):
 #             stress intensity correction factor
 #         """
 #         p = P([1.12, -0.23, 10.55, -21.72, 30.39])
-#         return 1.12 if use_approx else p(self.depth/self.ice_thickness)
+#         return 1.12 if use_approx else p(self.depth/self.ice_thickness
 
 #     def tensile_stress(self):
 #         """calculate tensile stress
@@ -631,8 +632,10 @@ class IceBlock(Ice):
 #         return (
 #             (
 #                 self.fracture_toughness
-#                 - self.tensile_stress(self.Rxx, self.depth,self.ice_thickness)
-#                 + 0.683 * self.ice_density * g * sqrt(pi) * self.depth ** 1.5
+#                 - self.tensile_stress(self.Rxx, self.depth,
+#                                       self.ice_thickness)
+#                 + 0.683 * self.ice_density * g * sqrt(pi)
+#                       * self.depth ** 1.5
 #             )
 #             / (0.683 * DENSITY_WATER * g * sqrt(pi))
 #         ) ** (2 / 3)
@@ -643,13 +646,15 @@ class IceBlock(Ice):
 #                              ):
 #         # define D and alpha for a water-free crevasse
 #         sigma_A = self.applied_stress(sigma_T, self.depth,
-#                                       self.water_depth, has_water=has_water)
+#                                       self.water_depth,
+#                                       has_water=has_water)
 #         # define constant to advoid repeated terms in D equation
 #         c1 = (2*alpha)/(mu*pi)
 #         D = (c1*pi*sigma_A * diff_squares(self.depth, z)
 #              + c1*DENSITY_ICE*g*self.depth*diff_squares(self.depth, z)
 #              - c1*DENSITY_ICE * g * z ** 2 * 0.5 *
-#              np.log(sum_over_diff(self.depth, diff_squares(self.depth, z)))
+#              np.log(sum_over_diff(self.depth,
+#                   diff_squares(self.depth, z)))
 #              )
 #         if has_water:
 #             c1 = c1 * DENSITY_WATER * g
@@ -673,7 +678,8 @@ class IceBlock(Ice):
 #     def sigma(self):
 #         return (self.sigma_T - (2 * DENSITY_ICE * g * self.depth) / pi
 #                 - DENSITY_WATER * g * self.water_depth
-#                 + (2/pi)*DENSITY_WATER * g * self.water_depth * math.asin(
+#                 + (2/pi)*DENSITY_WATER * g * self.water_depth
+#                   * math.asin(
 #                 self.water_depth/self.depth)
 #                 + ((2*DENSITY_WATER*g) / pi) * math.sqrt(
 #                 self.depth ** 2 - self.water_depth ** 2)

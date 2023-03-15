@@ -286,16 +286,23 @@ def elastic_displacement(z,
     """calculate elastic crevasse wall displacement from applied stress sigma_T.
 
 
+    Calculates Weertman's D-equation describing crevasse wall
+    displacement with depth
+
+    D(z) - Horizontal crevasse wall displacement with depth z
+
+
     Parameters
     ----------
-    z 
+    z : np.array
+        negative veertical distance from ice surface
     sigma_T : 
     mu : float, int
         ice softness
     crevasse_depth : float, int
         distance between ice surface and crevasse tip in m (positive).
     water_depth : 
-        distance between ice and water surface within crevasse (m).
+        depth of water surface within crevasse (negative)
     alpha : tuple, optional
         Defaults to (1-POISSONS_RATIO).
     has_water : bool, optional
