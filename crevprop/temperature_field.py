@@ -160,11 +160,9 @@ class ThermalModel():
         self.length = length
         self.ice_thickness = ice_thickness
         self.dt = dt_T
-        # self.diffusive_lengthscale = self._diffusion_lengthscale()
-        # self.dx = (0.5*self.length) / round(0.5*self.length /
-        # self.diffusive_lengthscale)
         self.dz = dz if self._ge(dz, 5) else 5
         self.dx = dx
+
         # NOTE: end of range = dx or dz to make end of array = 0
         self.z = np.arange(-self.ice_thickness, self.dz, self.dz) if isinstance(
             self.dz, int) else np.arange(-self.ice_thickness, self.dz, self.dz)
@@ -192,8 +190,8 @@ class ThermalModel():
 
         # crevasse info
         self.crevasses = crevasses
-        # self.crev
         self.crev_idx = self.find_crev_idx()
+        # self.virtualblue =
 
     def _diffusion_lengthscale(self):
         """calculate the horizontal diffusion of heat through ice, m"""
@@ -351,8 +349,8 @@ class ThermalModel():
         for the the previous two timesteps 
 
         """
-        self.Tnm1 = self.T0
-        self.T0 = self.T
+        setattr(self, 'Tmn1', self.T0)
+        setattr(self, 'T0', self.T)
 
         nx = self.x.size
 
@@ -389,13 +387,17 @@ class ThermalModel():
         as follows:
 
         V_frz(z)/dt = ki/Lf*rho_i [dT_L(x,z)/dx + dT_R(x,z)/dx]
+
         where
-        ki is the thermal conductivity of ice
-        Lf is the latent heat of freezing
-        dt thermal model timestep
-        TL and TR are the temperatures at the left and right crevasse
-            walls respectively
-        dx = the diffusion length over a year (~5 meters)
+            ki is the thermal conductivity of ice
+            Lf is the latent heat of freezing
+            dt thermal model timestep
+            TL and TR are the temperatures at the left and right crevasse
+                walls respectively
+            dx = the diffusion length over a year (~5 meters)
+
+
+
         """
         # calculate refreezing for each crevasse
 
@@ -414,6 +416,7 @@ class ThermalModel():
 
         for num, crev in enumerate(self.crevasses):
 
+            # ice temp on downglacier side of crevasse (right)
             T_down = self.T.flatten()[[x + ind for x in self.crev_idx[num]]]
 
             # use downglacier temperatures if domain is too small
@@ -458,6 +461,9 @@ class ThermalModel():
         T_depth : np.array
             Temperatures ~5.6m into the ice (horizontally) from crevasse
             walls. 5.6 meters is the diffusive lengthscale for one year
+        prevent_negatives : bool
+            whether to prevent negative refreezing (i.e., melting). by
+            default True
 
         Returns
         -------
