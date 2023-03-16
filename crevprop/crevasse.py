@@ -54,10 +54,68 @@ class CrevasseField:
                  length,
                  fracture_toughness,
                  crev_spacing,
-                 sigmaT=120e3,
+                 sigmaT0=120e3,
+                 PFA_depth=None,
                  crev_count=None,
                  crev_locs=None,
+                 blunt=False,
+                 include_creep=False,
+                 never_closed=True,
+                 water_compressive=False
                  ):
+        """_summary_
+
+        Parameters
+        ----------
+        x : np.array
+            x-coordinates of model geometry/domain. 
+        z : np.array
+            depth-vector corresponding to ice block thickness
+        dx : float
+            horizontal sampling resolution of ice block (m)
+        dz : int, float
+            vertical sampling resolution of ice block (m)
+        dt : float
+            timestep of model runs
+        ice_thickness : float, int
+            thickness of ice block in meters
+        length : float, int
+            length of ice block in meters
+        fracture_toughness : int
+            fracture toughness of ice in Pa m^0.5
+        crev_spacing : int
+            spacing of crevasses within crevasse field in meters.
+        sigmaT0 : float, int, optional
+            maximum far field tensile stress, amplitude of the stress
+            field that the ice mass gets advected through, 
+            by default 120e3 Pa m^0.5
+        PFA_depth : float, int, optional
+            meters penetration required to access the perrenial firn 
+            aquifer, by default None
+        crev_count : _type_, optional
+            _description_, by default None
+        crev_locs : _type_, optional
+            _description_, by default None
+        include_creep : bool, optional
+            consider creep closure in model, by default False
+            NOTE: creep not yet supported by model due to data input 
+            requirements
+        blunt : bool, optional
+            whether to blunt the stresses on individual crevasses, used
+            with creep calculation and sets sigmaTcrev=0 for 
+            interior crevasses within crevasse field, by default False
+        never_closed : bool, optional
+            always allow melt into the crevasse regardless of 
+            near-surface pintching. This only affects the Qin calc.
+            by default True.
+        water_compressive : bool, optional
+            whether to allow water into crevasse when the longitudinal 
+            stress on the crevasse is negative (compressive stress 
+            regeime). If false, don't allow water into crevasse if in a
+            compressive regeime. This affects the Qin calculation. 
+            by default False
+
+        """
 
         self.ice_thickness = ice_thickness
         self.x = x
@@ -70,31 +128,58 @@ class CrevasseField:
         self.crev_locs = crev_locs if crev_locs else [(-self.length, -0.1)]
         self.crev_spacing = crev_spacing
         self.crev_count = crev_count if crev_count else 1
+        self.crev_list = []
 
-        # Pa m^0.5 fracture toughness of ice
         self.fracture_toughness = fracture_toughness
         self.ice_softness = 1e8  # how soft is the ice
 
-        # maximum tensile stress (xx) const, amp of stress field that
-        # ice mass gets advected through
-        self.sigmaT0 = sigmaT  # far-field tensile stress
+        self.sigmaT0 = sigmaT0
         self.sigmaCrev = 0  # changes sigma on each crev
         self.wps = 3e3  # positive strain area width (m) half-wavelength
 
-        # weather to blunt the stresses
-        # (sigmaTcrev=0 for interior crevasses) used with creep calc
-        self.blunt = False
-        self.include_creep = True  # use creep model or not
-        # always allow melt in, regardless of near-surface pinching
-        # only affects Vin calc
-        self.never_closed = True
+        self.PFA_depth = PFA_depth
 
-        # allow water when longitundinal stress is negative
-        # (compressive stress regeime)
-        # don't allow water in to crev if in compressive regeime --
-        # affects Qin calc
-        self.water_compressive = False
-        self.PFA_depth = 30  # meters penetration required to access pfa
+        self.blunt = blunt
+        self.include_creep = include_creep
+        self.never_closed = never_closed
+        self.water_compressive = water_compressive
+
+    def stress_field(self):
+        """define stress field based on model geometry
+
+        stress field = sin wave with an amplitude matching
+        Rxx and a wavelength matching crevasse field length
+
+        a separate function will determine position within stress
+        field as model progresses (i.e., you will need to know the 
+        stresses at each crevasse location based on where they fall
+        within the stress field defined here.) Potentially move to 
+        crevasse field (or calculated here and then input to crevasse 
+        field class)
+
+        sigma_T = sigma_T0 * sin(-pi/ (wps * x))
+        where 
+        sigma_T = defines the stress sigma_T for all x in model domain
+        sigma_T0 = maximum tensile stress within stress field (Rxx)
+        wps = width of positive strain area (half wave length)
+        x = x-vector of model/iceblock 
+
+        """
+        pass
+
+    def create_crevasse(self):
+        """create and initialize a new crevasse"""
+        # new crevasses will be put in their designated location on the
+        # upstream edge of the model domain boundary of iceblock
+
+        # print statement
+
+        # initialize via running Crevasse class at init
+
+        # add storage terms to class and update attrs/data
+        # newCrev = Crevasse(self.z, self.dz, self.ice_thickness,)
+
+        pass
 
 
 class Crevasse:
@@ -143,6 +228,7 @@ class Crevasse:
                  Qin,
                  ice_softness,
                  sigmaCrev,
+                 name=None,
                  ice_density=917,
                  fracture_toughness=100e3,
                  include_creep=False,
@@ -160,46 +246,49 @@ class Crevasse:
 
 
         """
+        self.name = name
         self.z = z
         self.dz = z
         self.ice_thickness = ice_thickness
 
         self.fracture_toughness = fracture_toughness
         self.mu = ice_softness
+        self.ice_density = ice_density
+        # self.flotation_depth = (1-self.ice_density/1000) * self.ice_thickness
+
         # sigmaCrev = stress applied to/felt by crevasse
         self.sigmaCrev = sigmaCrev
-        self.ice_density = ice_density
 
         self.depth = 0.1
         self.volume = 1e-4
         # water-filled crevasse
         self.Qin = Qin
-        self.Vmelt = 0
-        self.Vpfa = 0
+        # self.Vmelt = 0
+        # self.Vpfa = 0
         self.Vwater = 1e-4
         # depth = distance from ice surface to water surface in crevasse
         self.water_depth = 0
         # height = height of water above crevasse tip
         self.water_height = 0
-        self.flotation_depth = (1-self.ice_density/1000) * self.ice_thickness
 
         # self.water_depth = self.depth - self.calc_water_height()
 
         # volume of water refrozen in crevasse, curent timestep
         self.Vfrz = 0
+        self.bluelayer = np.zeros_like(self.z)
 
         # volume of water refrozen in crevasse, prev timestep
         self.Vfrz_prev = 0
 
         # crevasse wall displacement D(z)
-        self.walls = np.zeros(len(self.z))
-        self.left_wall = -self.walls
-        self.right_wall = self.walls
+        # self.walls = np.zeros(len(self.z))
+        # self.left_wall = -self.walls
+        # self.right_wall = self.walls
 
         # optional
-        self.include_creep = include_creep  # note: reqs data
-        self.never_closed = never_closed
-        self.closed = False
+        # self.include_creep = include_creep  # note: reqs data
+        # self.never_closed = never_closed
+        # self.closed = False
 
         self.FTHF = False  # full thickness hydrofracture achieved?
 
@@ -236,7 +325,7 @@ class Crevasse:
         Vwater = Qin
 
         if Vwater > 1e-4 & self.depth < (self.ice_thickness - 10):
-            self.crevmorph(Qin)
+            morph = self.crevmorph(Qin)
 
         elif self.depth >= (self.ice_thickness - 10):
             # do nothing fracture mechanics related but set water level
