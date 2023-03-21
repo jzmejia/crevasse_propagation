@@ -257,13 +257,16 @@ class IceBlock(Ice):
         dt=0.5,
         thermal_freq=2,
         crev_spacing=30,
-        crev_count=None,
         T_profile=None,
         T_surface=None,
         T_bed=None,
         u_surf=100.,
-        fracture_toughness=None,
-        ice_density=None
+        fracture_toughness=100e3,
+        ice_density=917,
+        blunt=False,
+        include_creep=False,
+        never_closed=True,
+        water_compressive=False
     ):
         """
         Parameters
@@ -305,39 +308,44 @@ class IceBlock(Ice):
 
         super().__init__(ice_density, fracture_toughness)
 
-        # material properties
-        # self.density = ice_density
-        # self.fracture_toughness = fracture_toughness
-
         # time domain
+        # initialize model to time=0
+        self.t = 0
         self.dt = dt * pc.SECONDS_IN_DAY
         self.dt_T = self._thermal_timestep(dt, thermal_freq)
 
         # ice block geometry
-        self.length = self.calc_length(u_surf, crev_count, crev_spacing)
+        self.length = self.calc_length(u_surf, 1, crev_spacing)
         self.dx = self.calc_dx()
-        self.x = np.arange(-self.dx-self.length, self.dx, self.dx)
+        # why is this starting at -length-dx?
+        # self.x = np.arange(-self.dx-self.length, self.dx, self.dx)
+        # changing back to starting at -length - 3/21/2023
+        self.x = np.arange(-self.length, self.dx, self.dx)
 
         self.ice_thickness = ice_thickness
         self.dz = dz
         self.z = np.arange(-self.ice_thickness, self.dz, self.dz)
 
-
         # ice velocity
         self.u_surf = u_surf / pc.SECONDS_IN_YEAR
-        
-        
+
         # crevasse field
-        
-        self.crevasses = self._init_crevfield(crev_spacing, crev_count)
+        self.crevasse_spacing = crev_spacing
+        # can multiply by int (num years to form new crevs/track for)
+        self.max_crevs = round(self.u_surf/self.crevasse_spacing)
+        self.crevasse_field = self._init_crevfield(blunt,
+                                                   include_creep,
+                                                   never_closed,
+                                                   water_compressive)
+        # temporary way to store crevasse info
         self.crev_locs = [(-self.length, -3)]
-        self.bluelayer = self.crevasses.bluelayer
-        
+        # temporary storage for refreezing to bass back and forth
+        # self.bluelayer = self.crevasses.bluelayer
 
         # temperature field
-        self.temperature = self._init_temperatures(T_profile, T_surface, T_bed)
-
-        
+        self.temperature = self._init_temperatures(T_profile,
+                                                   T_surface,
+                                                   T_bed)
 
         # stress field
 
@@ -352,9 +360,6 @@ class IceBlock(Ice):
 
     #     pass
 
-    def _max_crevasses(self):
-        
-        return max_num_crev
     def _init_geometry(self):
         """initialize ice block geometry
 
@@ -382,15 +387,22 @@ class IceBlock(Ice):
             thermal_diffusivity=self.kappa
         )
 
-    def _init_crevfield(self, crev_spacing, crev_count):
+    def _init_crevfield(self, blunt, include_creep, never_closed, water_compressive):
         """Initialize CrevasseField for given model geometry"""
-        crevasse_field = CrevasseField(self.x, self.z,
-                                       self.dx, self.dz, self.dt,
+        crevasse_field = CrevasseField(self.z,
+                                       self.dx,
+                                       self.dz,
+                                       self.dt,
                                        self.ice_thickness,
+                                       self.x,
                                        self.length,
                                        self.fracture_toughness,
-                                       crev_spacing,
-                                       crev_count=crev_count
+                                       self.crevasse_spacing,
+                                       self.max_crevs,
+                                       blunt=blunt,
+                                       include_creep=include_creep,
+                                       never_closed=never_closed,
+                                       water_compressive=water_compressive
                                        )
         return crevasse_field
 
@@ -462,9 +474,9 @@ class IceBlock(Ice):
 
         Parameters
         ----------
-        usurf
-        crev_count
-        crev_spacing
+        usurf : float, int
+        crev_count : int
+        crev_spacing  : int
 
         """
         crev_count = crev_count if crev_count else 1
