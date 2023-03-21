@@ -33,7 +33,7 @@ from .physical_constants import DENSITY_ICE, DENSITY_WATER, POISSONS_RATIO
 # 3. Refreezing rate(diffusion and temperature gradient at sidewalls)
 
 
-class CrevasseField:
+class CrevasseField():
     """Container for all crevasses within model domain
 
     Primary roles:
@@ -42,28 +42,55 @@ class CrevasseField:
         model runs through time and crevasses are advected downglacier
 
 
+    Attributes
+    ----------
+    fracture_toughness: int
+        fracture toughness of ice in Pa m^0.5
+    crev_spacing: int
+        spacing of crevasses within crevasse field in meters. Value
+        defined in `IceBlock` and remains unchanged.
+    sigmaT0: float, int, optional
+        maximum far field tensile stress, amplitude of the stress
+        field that the ice mass gets advected through,
+        by default 120e3 Pa m ^ 0.5
+    PFA_depth: float, int, optional
+        meters penetration required to access the perrenial firn
+        aquifer, by default None
+    crev_count: int
+        number of crevasses in crevasse field
+    crev_locs: list of tuples
+        x-coordinates of each crevasse in field with current depths
     """
 
     def __init__(self,
-                 x,
                  z,
                  dx,
                  dz,
                  dt,
                  ice_thickness,
+
+                 x,
+
+
+
                  length,
+
+
+
                  fracture_toughness,
                  crev_spacing,
+                 max_crevs,
                  sigmaT0=120e3,
+
+
                  PFA_depth=None,
-                 crev_count=None,
                  crev_locs=None,
                  blunt=False,
                  include_creep=False,
                  never_closed=True,
-                 water_compressive=False
+                 water_compressive=False  # , *args, **kwargs
                  ):
-        """_summary_
+        """
 
         Parameters
         ----------
@@ -92,10 +119,6 @@ class CrevasseField:
         PFA_depth : float, int, optional
             meters penetration required to access the perrenial firn 
             aquifer, by default None
-        crev_count : _type_, optional
-            _description_, by default None
-        crev_locs : _type_, optional
-            _description_, by default None
         include_creep : bool, optional
             consider creep closure in model, by default False
             NOTE: creep not yet supported by model due to data input 
@@ -116,7 +139,7 @@ class CrevasseField:
             by default False
 
         """
-
+        # model geometry and domian management
         self.ice_thickness = ice_thickness
         self.x = x
         self.z = z
@@ -125,24 +148,41 @@ class CrevasseField:
         self.dt = dt
         self.length = length
 
-        self.crev_locs = crev_locs if crev_locs else [(-self.length, -0.1)]
         self.crev_spacing = crev_spacing
-        self.crev_count = crev_count if crev_count else 1
-        self.crev_list = []
+        self.max_crevs = max_crevs
 
+        # ice properties
         self.fracture_toughness = fracture_toughness
         self.ice_softness = 1e8  # how soft is the ice
 
+        #  run create_crevasse at this point then
+        # identify crevasses in instances object by calling
+        # Crevasse.instances e.g., self.crevasses=Crevasse.instances
+        # at bottom for now make a method so that i don't need all this
+        self.crevasses = self.create_crevasse()
+        self.crev_locs = crev_locs if crev_locs else [(-self.length, -0.1)]
+        self.crev_count = self.crevasse_list()
+
+        # temporary things needed for stress field
         self.sigmaT0 = sigmaT0
         self.sigmaCrev = 0  # changes sigma on each crev
         self.wps = 3e3  # positive strain area width (m) half-wavelength
 
         self.PFA_depth = PFA_depth
 
+        # model options
         self.blunt = blunt
         self.include_creep = include_creep
         self.never_closed = never_closed
         self.water_compressive = water_compressive
+
+        self.crev_instances = Crevasse.instances
+
+    def crevasse_list(self):
+        # example
+        crev_count = Crevasse.length()
+        print(f"number of crevasses in crevasse field: {crev_count}")
+        return crev_count
 
     def stress_field(self):
         """define stress field based on model geometry
@@ -178,7 +218,16 @@ class CrevasseField:
 
         # add storage terms to class and update attrs/data
         # newCrev = Crevasse(self.z, self.dz, self.ice_thickness,)
-
+        Qin = 1e-4  # zero value
+        sigmaCrev = 10e4
+        Crevasse(self.z,
+                 self.dz,
+                 self.ice_thickness,
+                 self.x[0],
+                 Qin,
+                 self.ice_softness,
+                 sigmaCrev,
+                 fracture_toughness=self.fracture_toughness)
         pass
 
 
@@ -220,11 +269,13 @@ class Crevasse:
 
 
     """
+    instances = []
 
     def __init__(self,
                  z,
                  dz,
                  ice_thickness,
+                 x_coord,
                  Qin,
                  ice_softness,
                  sigmaCrev,
@@ -248,8 +299,9 @@ class Crevasse:
         """
         self.name = name
         self.z = z
-        self.dz = z
+        self.dz = dz
         self.ice_thickness = ice_thickness
+        self.x_coord = x_coord
 
         self.fracture_toughness = fracture_toughness
         self.mu = ice_softness
@@ -286,9 +338,9 @@ class Crevasse:
         # self.right_wall = self.walls
 
         # optional
-        # self.include_creep = include_creep  # note: reqs data
-        # self.never_closed = never_closed
-        # self.closed = False
+        self.include_creep = include_creep  # note: reqs data
+        self.never_closed = never_closed
+        self.closed = False
 
         self.FTHF = False  # full thickness hydrofracture achieved?
 
@@ -299,7 +351,10 @@ class Crevasse:
         # volume error fractional ratio (Vwater-Vcrev)/Vwater
         self.voltol = 1e-3
 
-    # three crevasse processes considered here
+        Crevasse.instances.append(self)
+
+    def length(self):
+        return len(self.instances)
 
     def evolve(self, Qin, sigmaCrev):
         """evolve crevasse for new timestep and inputs
@@ -519,6 +574,24 @@ class Crevasse:
                        water_depth,
                        has_water=True
                        ):
+        """calculate applied stress Rxx on crevasse walls
+
+        Parameters
+        ----------
+        sigma_T : float, int
+            far field stress
+        crevasse_depth : float
+            crevasse depth below ice surface in meters
+        water_depth : float, int
+            water depth below ice surface in meters
+        has_water : bool, optional
+            is there any water within crevasse? by default True
+
+        Returns
+        -------
+        applied_stress: float
+            stress applied to crevasse walls (Rxx)
+        """
         sigma_A = sigma_T - (2 * self.ice_density * g * crevasse_depth)/pi
         if has_water or water_depth:
             sigma_A = (sigma_A
