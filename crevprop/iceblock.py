@@ -377,10 +377,22 @@ class IceBlock(Ice):
         z = np.arange(-self.ice_thickness, self.dz, self.dz)
         return x, z
 
-    def _init_temperatures(self, T_profile, T_surface, T_bed):
+    def _init_temperatures(self,
+                           T_profile,
+                           T_surface,
+                           T_bed
+                           ):
         return None if isinstance(T_profile, type(None)) else ThermalModel(
-            self.ice_thickness, self.length, self.dt_T, self.dz, self.dx,
-            self.crev_locs, T_profile, T_surface, T_bed,
+            self.ice_thickness,
+            self.length,
+            self.dt_T,
+            self.dz,
+            self.dx,
+            self.x,
+            self.crev_locs,
+            T_profile,
+            T_surface,
+            T_bed,
             thermal_conductivity=self.ki,
             ice_density=self.ice_density,
             latient_heat_of_freezing_ice=self.Lf,

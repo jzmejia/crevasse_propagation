@@ -107,6 +107,7 @@ class ThermalModel():
         dt_T: Union[int, float],
         dz: Union[int, float],
         dx: float,
+        x: np.array,
         crevasses,
         T_profile,
         T_surface=None,
@@ -166,7 +167,8 @@ class ThermalModel():
         # NOTE: end of range = dx or dz to make end of array = 0
         self.z = np.arange(-self.ice_thickness, self.dz, self.dz) if isinstance(
             self.dz, int) else np.arange(-self.ice_thickness, self.dz, self.dz)
-        self.x = np.arange(-self.dx-self.length, self.dx, self.dx)
+        # why start at -dx-self.length?
+        self.x = x
 
         self.udef = udef  # defaults to 0, can be int/float/depth vector
 
@@ -308,7 +310,7 @@ class ThermalModel():
         return A
 
     def find_crev_idx(self, nested=True):
-        '''creating a list of matrix indicies for crevasse locations
+        '''creating a list of T matrix indicies for crevasse locations
 
         Parameters
         ----------
@@ -325,21 +327,28 @@ class ThermalModel():
         crev_idx = []
 
         for crev in self.crevasses:
+
             # crevasse index at ice surface
             crev_x = (self.x.size * self.z.size - 1) - \
                 abs(round(crev[0]/self.dx))
 
-            # find depth indicies for crevasse
-            if abs(crev[1]) >= 2*self.dz and abs(crev[1]) < self.ice_thickness:
-                idx = np.arange(crev_x - (abs(np.floor(crev[1]/self.dz)) - 1)
-                                * self.x.size, crev_x + self.x.size,
-                                self.x.size, dtype=int).tolist()
+            # index at crevasse tip (on thermal model grid)
+            if abs(crev[1]) >= 2*self.dz:
+                crevtip = crev_x-(abs(np.floor(crev[1]/self.dz))-1)*self.x.size
             else:
-                idx = [crev_x]
+                crevtip = crev_x-(abs(np.floor(crev[1]/self.dz))) * self.x.size
+
+            # TODO add in error if crev depth > ice thickness
+
+            idx = np.arange(crevtip, crev_x + self.x.size,
+                            self.x.size, dtype=int).tolist()
+
+            #     idx = [crev_x]
 
             crev_idx.append(idx)
 
         self.crev_idx = crev_idx
+        # setattr(self,'crev_idx',crev_idx) # not sure difference
         return crev_idx if nested else flatten(crev_idx)
 
     def calc_temperature(self):
@@ -414,6 +423,9 @@ class ThermalModel():
 
         ind = round(5.6/self.dx)
 
+        blueband_left = []
+        blueband_right = []
+
         for num, crev in enumerate(self.crevasses):
 
             # ice temp on downglacier side of crevasse (right)
@@ -421,21 +433,38 @@ class ThermalModel():
 
             # use downglacier temperatures if domain is too small
             T_up = self.T.flatten()[[x - ind for x in self.crev_idx[num]]
-                                    ] if self.x[0] >= crev[0]-5.6 else T_down
+                                    ] if self.x[0] >= crev[0]-5.6 else -T_down
 
             # unsure if used?
-            bluelayer_left = self.calc_refreezing(
-                self.T.flatten()[self.crev_idx[num]], T_up)
-            bluelayer_right = self.calc_refreezing(
-                self.T.flatten()[self.crev_idx[num]], T_down)
+            # bluelayer_left = self.calc_refreezing(
+            #     self.T.flatten()[self.crev_idx[num]], T_up)
+            # bluelayer_right = self.calc_refreezing(
+            #     self.T.flatten()[self.crev_idx[num]], T_down)
 
             # virtual blue = difference from T=0C (water temperature)
-            virtualblue_left = self.calc_refreezing(T_up, 0)
-            virtualblue_right = self.calc_refreezing(0, T_down)
 
-        return
+            # TODO! NOT CURRENTLY BEING SAVED FOR THE LOOP?
+            virtualblue_left = self.calc_refreezing(T_up, self.T_crev)
+            virtualblue_right = self.calc_refreezing(self.T_crev, T_down)
 
-    def calc_refreezing(self, T_crevasse, T_depth, prevent_negatives=True):
+            # do you want to convert to volume?
+
+            # virtualblue will now be at thermal model resolution
+            # pass back to iceblock
+
+            blueband_left.append(virtualblue_left)
+            blueband_right.append(virtualblue_right)
+
+        self.blueband_left = blueband_left
+        self.blueband_right = blueband_right
+
+        return virtualblue_left, virtualblue_right
+
+    def calc_refreezing(self,
+                        T_crevasse,
+                        T_ice,
+                        # prevent_negatives=True
+                        ):
         """Refreezing layer thickness at crevasse wall in meters.
 
         The refreezing rate of meltwater Vfrz(z) can be approximated
@@ -458,25 +487,27 @@ class ThermalModel():
         ----------
         T_crevasse : np.array
             Ice temperatures along crevasse wall
-        T_depth : np.array
+        T_ice : np.array
             Temperatures ~5.6m into the ice (horizontally) from crevasse
             walls. 5.6 meters is the diffusive lengthscale for one year
-        prevent_negatives : bool
-            whether to prevent negative refreezing (i.e., melting). by
-            default True
+        # prevent_negatives : bool
+        #     whether to prevent negative refreezing (i.e., melting). by
+        #     default True
 
         Returns
         -------
         bluelayer : np.array
             refrozen layer thickness in meters along crevasse walls for 
-            thermal model timestep dt
+            thermal model timestep dt NOTE: does not account for the
+            volume difference between ice and water, must consider 
+            that before converting to a volumetric value.
 
         """
         bluelayer = self.dt * (self.ki/self.Lf/self.ice_density) * (
-            T_crevasse - T_depth) / (round*(5.6/self.dx)*self.dx)
+            T_crevasse - T_ice) / (round(5.6/self.dx)*self.dx)
 
         # set to zero if any values are negative
-        if prevent_negatives:
-            np.place(bluelayer, bluelayer < 0, 0)
+        # if prevent_negatives:
+        #     np.place(bluelayer, bluelayer < 0, 0)
 
         return bluelayer
