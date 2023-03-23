@@ -1,6 +1,7 @@
 """Crevasse """
 import math as math
 
+from typing import Union
 import numpy as np
 from numpy.lib.function_base import diff
 from numpy import sqrt, abs
@@ -63,22 +64,22 @@ class CrevasseField():
     """
 
     def __init__(self,
-                 z,
-                 dx,
+                 z: np.array,
+                 dx: float,
                  dz,
-                 dt,
+                 dt: float,
                  ice_thickness,
 
-                 x,
+                 x: np.array,
 
 
 
-                 length,
+                 length: float,
 
 
 
                  fracture_toughness,
-                 crev_spacing,
+                 crev_spacing: Union[int, float],
                  max_crevs,
                  sigmaT0=120e3,
 
@@ -160,8 +161,8 @@ class CrevasseField():
         # Crevasse.instances e.g., self.crevasses=Crevasse.instances
         # at bottom for now make a method so that i don't need all this
         self.crevasses = self.create_crevasse()
-        self.crev_locs = crev_locs if crev_locs else [(-self.length, -0.1)]
-        self.crev_count = self.crevasse_list()
+        self.crev_locs = [(-self.length, -0.1)]
+        self.crev_count = len(self.crev_locs)  # self.crevasse_list()
 
         # temporary things needed for stress field
         self.sigmaT0 = sigmaT0
@@ -180,7 +181,7 @@ class CrevasseField():
 
     def crevasse_list(self):
         # example
-        crev_count = Crevasse.length()
+        crev_count = self.crev_instances.length()
         print(f"number of crevasses in crevasse field: {crev_count}")
         return crev_count
 
@@ -228,7 +229,6 @@ class CrevasseField():
                  self.ice_softness,
                  sigmaCrev,
                  fracture_toughness=self.fracture_toughness)
-        pass
 
 
 class Crevasse:
@@ -464,10 +464,10 @@ class Crevasse:
             # REFREEZING CONTRIBUTION TO CREVASSE WIDTH
 
             # Creep Closure - calculated from data for area
-            if self.creep_closing:
-                CDiff = self.creep_closing()
-            else:
-                CDiff = np.zeros_like(FDiff_left)
+            # if self.creep_closing:
+            #     CDiff = self.creep_closing()
+            # else:
+            #     CDiff = np.zeros_like(FDiff_left)
 
         pass
 
