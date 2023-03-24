@@ -129,6 +129,9 @@ class ThermalModel():
             Length of model domain in the x-direction (m).
         dt_T : int, float
             thermal model timestep in seconds.
+        thermal_freq : int
+            frequency thermal model is run in comparison to crevasse 
+            runs. dt * thermal_freq = dt_T
         dz : int, float:
             vertical resolution for domain (m). Value is set to 5 m if 
             input value is below 5 to reduce computational load. 
@@ -156,6 +159,7 @@ class ThermalModel():
         self.ki = thermal_conductivity
         self.Lf = latient_heat_of_freezing_ice
         self.kappa = thermal_diffusivity
+        self.heat_capacity_intercept = 2115.3
 
         # geometry
         self.length = length
@@ -171,6 +175,11 @@ class ThermalModel():
         self.x = x
 
         self.udef = udef  # defaults to 0, can be int/float/depth vector
+
+        # crevasse info
+        self.crevasses = crevasses
+        self.crev_idx = self.find_crev_idx()
+        self.virtualblue = self.calc_refreezing()
 
         # Boundary Conditions
         self.T_surface = T_surface if T_surface else 0
@@ -189,11 +198,6 @@ class ThermalModel():
         # For solver to consider horizontal ice velocity a udef term
         # needs to be added at some point
         # For sovler to consider vertical ice velocity need ablation
-
-        # crevasse info
-        self.crevasses = crevasses
-        self.crev_idx = self.find_crev_idx()
-        # self.virtualblue =
 
     def _diffusion_lengthscale(self):
         """calculate the horizontal diffusion of heat through ice, m"""
@@ -362,6 +366,7 @@ class ThermalModel():
         setattr(self, 'T0', self.T)
 
         nx = self.x.size
+        crev_idx = self.find_crev_idx(nested=False)
 
         A = self.A_matrix()
 
@@ -375,12 +380,26 @@ class ThermalModel():
         rhs[np.arange(nx, self.T.size-nx, nx)] = self.T_upglacier[1:-1]
         rhs[np.arange(2*nx-1, self.T.size-nx, nx)] = self.T_downglacier[1:-1]
 
-        # add latent heat source term near crevasses
-        # upstream of crevasse
-        # rhs[crev_idx - 1] = rhs[crev_idx -1] + (Lf/B * virtualblue[])/dx
+        # apply source term for latent heat near crevasses
 
         # downstream of creasse
-        # rhs[crev_idx + 1] = rhs[crev_idx +1] + (Lf/B * virtualblue[])/dx
+        idx_surface = rhs.size-nx
+        idx = [x+1 for x in crev_idx if x < idx_surface]
+        rhs[idx] = rhs[idx] + (self.Lf/self.heat_capacity_intercept
+                               * flatten(self.bluelayer_right)) / self.dx
+
+        for num, crev in enumerate(self.crev_idx):
+            # upstream of crevasse
+            if num+1 < len(self.crev_idx) or max(crev) > rhs.size-nx:
+                idx = [x-1 for x in crev if x < idx_surface]
+                rhs[idx] = rhs[idx] + (self.Lf / self.heat_capacity_intercept
+                                       * self.virtualblue_right) / self.dx
+
+        # adjust for air in crevasse above water level
+        # need to pass water depth from crevasse to crevasse field,
+        # crevfield->iceblock->thermal model
+        # then assign Tsurf to those points probably only matters for
+        # alot of air in big crevasses
 
         # compute solution vector
         T = np.linalg.solve(A, rhs)
@@ -410,12 +429,8 @@ class ThermalModel():
         """
         # calculate refreezing for each crevasse
 
-        # maybe initialize virtual blue as zeros(self.z.length,num_crev)
-
         # calculate how much volume will refreeze in a year
         # indicies diffusive lengthscale for 1 year = 5.6 meters
-
-        # refrozen layer thickness
 
         # only make calculation if there is enough info in T
         # model must have advected more than 5.6 m
@@ -423,8 +438,8 @@ class ThermalModel():
 
         ind = round(5.6/self.dx)
 
-        blueband_left = []
-        blueband_right = []
+        bluelayer_left = []
+        bluelayer_right = []
 
         for num, crev in enumerate(self.crevasses):
 
@@ -435,30 +450,21 @@ class ThermalModel():
             T_up = self.T.flatten()[[x - ind for x in self.crev_idx[num]]
                                     ] if self.x[0] >= crev[0]-5.6 else -T_down
 
-            # unsure if used?
-            # bluelayer_left = self.calc_refreezing(
-            #     self.T.flatten()[self.crev_idx[num]], T_up)
-            # bluelayer_right = self.calc_refreezing(
-            #     self.T.flatten()[self.crev_idx[num]], T_down)
-
-            # virtual blue = difference from T=0C (water temperature)
-
-            # TODO! NOT CURRENTLY BEING SAVED FOR THE LOOP?
             virtualblue_left = self.calc_refreezing(T_up, self.T_crev)
             virtualblue_right = self.calc_refreezing(self.T_crev, T_down)
 
-            # do you want to convert to volume?
+            # save virtualblue as bluelayer to be used in thermal model
+            # only for source term in Temperature calculations
+            bluelayer_left.append(virtualblue_left)
+            bluelayer_right.append(virtualblue_right)
 
-            # virtualblue will now be at thermal model resolution
-            # pass back to iceblock
+            # now divide by thermal_freq to get refreezing rate for
+            # crevasse model runs and convert to IceBlock z-res
 
-            blueband_left.append(virtualblue_left)
-            blueband_right.append(virtualblue_right)
+        self.bluelayer_left = bluelayer_left
+        self.bluelayer_right = bluelayer_right
 
-        self.blueband_left = blueband_left
-        self.blueband_right = blueband_right
-
-        return virtualblue_left, virtualblue_right
+        return bluelayer_left, bluelayer_right
 
     def calc_refreezing(self,
                         T_crevasse,
@@ -498,9 +504,8 @@ class ThermalModel():
         -------
         bluelayer : np.array
             refrozen layer thickness in meters along crevasse walls for 
-            thermal model timestep dt NOTE: does not account for the
-            volume difference between ice and water, must consider 
-            that before converting to a volumetric value.
+            thermal model timestep dt, accounts for expansion of water
+            as it refreezes. 
 
         """
         bluelayer = self.dt * (self.ki/self.Lf/self.ice_density) * (
@@ -510,4 +515,4 @@ class ThermalModel():
         # if prevent_negatives:
         #     np.place(bluelayer, bluelayer < 0, 0)
 
-        return bluelayer
+        return bluelayer * (1000/self.ice_density)
