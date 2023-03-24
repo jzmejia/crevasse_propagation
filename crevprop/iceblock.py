@@ -312,6 +312,7 @@ class IceBlock(Ice):
         # initialize model to time=0
         self.t = 0
         self.dt = dt * pc.SECONDS_IN_DAY
+        self.thermal_freq = thermal_freq
         self.dt_T = self._thermal_timestep(dt, thermal_freq)
 
         # ice block geometry
@@ -360,6 +361,11 @@ class IceBlock(Ice):
 
     #     pass
 
+    def _get_virtualblue(self):
+        virtualblue_left, virtualblue_right = self.temperature.refreezing()
+
+        for num, crev in enumerate(virtualblue_left)
+
     def _init_geometry(self):
         """initialize ice block geometry
 
@@ -399,7 +405,12 @@ class IceBlock(Ice):
             thermal_diffusivity=self.kappa
         )
 
-    def _init_crevfield(self, blunt, include_creep, never_closed, water_compressive):
+    def _init_crevfield(self,
+                        blunt,
+                        include_creep,
+                        never_closed,
+                        water_compressive
+                        ):
         """Initialize CrevasseField for given model geometry"""
         crevasse_field = CrevasseField(self.z,
                                        self.dx,
