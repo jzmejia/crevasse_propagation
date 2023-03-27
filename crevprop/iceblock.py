@@ -366,7 +366,7 @@ class IceBlock(Ice):
 
         # for num, crev in enumerate(virtualblue_left):
 
-        pass
+        return virtualblue_left, virtualblue_right
 
     def _init_geometry(self):
         """initialize ice block geometry
