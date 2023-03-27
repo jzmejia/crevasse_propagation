@@ -471,20 +471,22 @@ class ThermalModel():
         ind = round(5.6/self.dx)
 
         # initalize
-        bluelayer_l = bluelayer_r = []
-        virtualblue_l = virtualblue_r = []
+        bluelayer_l = []
+        bluelayer_r = []
+        virtualblue_left = []
+        virtualblue_right = []
 
         for num, crev in enumerate(self.crevasses):
 
             # get indicies for all z cooresponding to crevasse
-            ft_idx = np.arange(np.remainder(crev[-1], self.x.size),
-                               crev[-1], self.x.size)
+            ft_idx = np.arange(np.remainder(self.crev_idx[num][-1], self.x.size),
+                               self.crev_idx[num][-1] + self.x.size, self.x.size)
 
             # ice temp on downglacier side of crevasse (right)
             T_down = self.T.flatten()[[x + ind for x in ft_idx]]
 
             # use downglacier temperatures if domain is too small
-            T_up = self.T.flatten()[[x - ind for x in self.ft_idx]
+            T_up = self.T.flatten()[[x - ind for x in ft_idx]
                                     ] if self.x[0] >= crev[0]-5.6 else -T_down
 
             virtualblue_l = self.calc_refreezing(T_up, self.T_crev)
@@ -493,8 +495,9 @@ class ThermalModel():
             # save np.arrays to list
             bluelayer_l.append(virtualblue_l[-len(self.crev_idx[num]):])
             bluelayer_r.append(virtualblue_r[-len(self.crev_idx[num]):])
-            virtualblue_l.append(virtualblue_l)
-            virtualblue_r.append(virtualblue_r)
+
+            virtualblue_left.append(virtualblue_l)
+            virtualblue_right.append(virtualblue_r)
 
         self.bluelayer_left = bluelayer_l
         self.bluelayer_right = bluelayer_r
@@ -502,7 +505,7 @@ class ThermalModel():
         # save if you want to here
         # self.virtualblue = (virtualblue_l, virtualblue_r)
 
-        return virtualblue_l, virtualblue_r
+        return virtualblue_left, virtualblue_right
 
     def calc_refreezing(self,
                         T_crevasse,
