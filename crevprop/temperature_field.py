@@ -1,4 +1,8 @@
 """
+Copyright (c) 2021-2023 by Jessica Mejia <jzmejia@buffalo.edu>
+
+
+
 A two-dimensional thermal model used to solve for temperature
 within the ice block defining model geometry.
 
