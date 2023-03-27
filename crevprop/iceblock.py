@@ -364,7 +364,9 @@ class IceBlock(Ice):
     def _get_virtualblue(self):
         virtualblue_left, virtualblue_right = self.temperature.refreezing()
 
-        for num, crev in enumerate(virtualblue_left)
+        # for num, crev in enumerate(virtualblue_left):
+
+        pass
 
     def _init_geometry(self):
         """initialize ice block geometry

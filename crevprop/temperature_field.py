@@ -318,11 +318,13 @@ class ThermalModel():
 
         Parameters
         ----------
-        nested : bool
+        nested : bool, default True
             return a nested list of crevasse indicies. If True return a
             nested list such that there is one list of indicies for
             each crevasse. If False return a flattened list. 
-            Defaults to True.
+        inplace: bool, default True
+            If False, return a copy. Otherwise, do operation inplace and
+            return updated class attribute.
 
         Returns
         -------
@@ -347,12 +349,10 @@ class ThermalModel():
             idx = np.arange(crevtip, crev_x + self.x.size,
                             self.x.size, dtype=int).tolist()
 
-            #     idx = [crev_x]
-
             crev_idx.append(idx)
 
         self.crev_idx = crev_idx
-        # setattr(self,'crev_idx',crev_idx) # not sure difference
+
         return crev_idx if nested else flatten(crev_idx)
 
     def calc_temperature(self):
@@ -424,6 +424,30 @@ class ThermalModel():
                 walls respectively
             dx = the diffusion length over a year (~5 meters)
 
+        Naming conventions:
+            virtualblue - potential refreezing rate for all z points
+                at crevasse location, therefore not limited to current
+                crevasse depth. Values passed to `IceBlock` and used by
+                `Crevasse` to find refreezing at crevasse walls as ice 
+                fractures deeper in subsequent timesteps. 
+            bluelayer - refreezing source term corresponding to actual
+                crevasse depth and water level, used to solve iceblock
+                temperatures in `.calc_temperature()`. Values internal
+                to `ThermalModel`, not used externally. 
+
+        Returns
+        -------
+        virtualblue_l, virtualblue_r : list of np.array
+            virtualblue, refreezing rate, for all points in ice 
+            thickness corresponding to each crevasse location. Retruns
+            list of np.arrays in the same order as `self.crevasses`. 
+            _l refers to left-hand (upglacier) side of crevasse wall and 
+            _r to the right-hand (downglacier) side.
+            NOTE: to be usable by `Crevasse` values in virtualblue need
+            to be divided by thermal frequency (e.g., current calc of
+            refreezing rate is at the timestep of the thermal model) and
+            interpolated to match the z resolution of IceBlock (e.g., 
+            calculations are currently at z-resolution of thermal model)
 
 
         """
@@ -438,33 +462,38 @@ class ThermalModel():
 
         ind = round(5.6/self.dx)
 
-        bluelayer_left = []
-        bluelayer_right = []
+        # initalize
+        bluelayer_l = bluelayer_r = []
+        virtualblue_l = virtualblue_r = []
 
         for num, crev in enumerate(self.crevasses):
 
+            # get indicies for all z cooresponding to crevasse
+            ft_idx = np.arange(np.remainder(crev[-1], self.x.size),
+                               crev[-1], self.x.size)
+
             # ice temp on downglacier side of crevasse (right)
-            T_down = self.T.flatten()[[x + ind for x in self.crev_idx[num]]]
+            T_down = self.T.flatten()[[x + ind for x in ft_idx]]
 
             # use downglacier temperatures if domain is too small
-            T_up = self.T.flatten()[[x - ind for x in self.crev_idx[num]]
+            T_up = self.T.flatten()[[x - ind for x in self.ft_idx]
                                     ] if self.x[0] >= crev[0]-5.6 else -T_down
 
-            virtualblue_left = self.calc_refreezing(T_up, self.T_crev)
-            virtualblue_right = self.calc_refreezing(self.T_crev, T_down)
+            virtualblue_l = self.calc_refreezing(T_up, self.T_crev)
+            virtualblue_r = self.calc_refreezing(self.T_crev, T_down)
 
-            # save virtualblue as bluelayer to be used in thermal model
-            # only for source term in Temperature calculations
-            bluelayer_left.append(virtualblue_left)
-            bluelayer_right.append(virtualblue_right)
+            # save np.arrays to list
+            bluelayer_l.append(virtualblue_l[-len(self.crev_idx[num]):])
+            bluelayer_r.append(virtualblue_r[-len(self.crev_idx[num]):])
+            virtualblue_l.append(virtualblue_l)
+            virtualblue_r.append(virtualblue_r)
 
-            # now divide by thermal_freq to get refreezing rate for
-            # crevasse model runs and convert to IceBlock z-res
+        self.bluelayer_left = bluelayer_l
+        self.bluelayer_right = bluelayer_r
 
-        self.bluelayer_left = bluelayer_left
-        self.bluelayer_right = bluelayer_right
+        # self.virtualblue = (virtualblue_l, virtualblue_r)
 
-        return bluelayer_left, bluelayer_right
+        return virtualblue_l, virtualblue_r
 
     def calc_refreezing(self,
                         T_crevasse,
