@@ -247,7 +247,6 @@ class IceBlock(Ice):
     Notes
     -----
     future versions aim to allow a density profile.
-
     """
 
     def __init__(
@@ -362,11 +361,37 @@ class IceBlock(Ice):
     #     pass
 
     def _get_virtualblue(self):
-        virtualblue_left, virtualblue_right = self.temperature.refreezing()
+        """gets and adjust refreezing values from ThermalModel
 
-        # for num, crev in enumerate(virtualblue_left):
+        executes `ThermalModel.refreezing()` on current instance defined
+        within `self.temperature`, then updates outputs for `IceBlock` 
+        `dz` and `dt`. Two list objects are returned, each containing
+        np.array objects with values, array objects are in the same
+        order as `ThermalModel.crevasses` and 
 
-        pass
+        Returns
+        -------
+        virtualblue_left, virtualblue_right : List
+            Lists of np.array objects containing potential refreezing
+            rates corresponding with crevasses in crevasse field. 
+        """
+        virtualblue_l, virtualblue_r = self.temperature.refreezing()
+
+        virtualblue_left = []
+        virtualblue_right = []
+
+        for num, crev in enumerate(virtualblue_l):
+            lhs = crev/self.thermal_freq
+            rhs = virtualblue_r[num]/self.thermal_freq
+
+            if self.dx != self.temperature.dx:
+                lhs = np.interp(self.z, self.temperature.z, lhs)
+                rhs = np.interp(self.z, self.temperature.z, rhs)
+
+            virtualblue_left.append(lhs)
+            virtualblue_right.append(rhs)
+
+        return virtualblue_left, virtualblue_right
 
     def _init_geometry(self):
         """initialize ice block geometry

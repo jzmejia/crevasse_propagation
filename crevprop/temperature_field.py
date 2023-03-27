@@ -1,20 +1,20 @@
 """
 A two-dimensional thermal model used to solve for temperature
-within the ice block defining model geometry. 
+within the ice block defining model geometry.
 
 Solvers used include a semi-implicit finite-difference scheme
 staggered leapfrog method for vertical advection
-upward motion scaled linearly from -b at the ice surface to 0 at 
-the bed. the entire domain is advected horizontally at 200 m/a 
+upward motion scaled linearly from -b at the ice surface to 0 at
+the bed. the entire domain is advected horizontally at 200 m/a
 Plug flow with Lagrangian reference frame
 
-For the plug flow simulation the model's domain expands for each 
-timestep at the upstream end of the horizontal model domain. 
+For the plug flow simulation the model's domain expands for each
+timestep at the upstream end of the horizontal model domain.
 The amount of ice added at the upstream end is determined by
 the annual ice velocity `u`, which when applied, pushes the model
-domain downstream. Once the model's horzontal domain exceeds a 
-length of 500 m, we remove the uppermost 200 m of domain. This 
-model configuration allows the model's domain to track the crevasse 
+domain downstream. Once the model's horzontal domain exceeds a
+length of 500 m, we remove the uppermost 200 m of domain. This
+model configuration allows the model's domain to track the crevasse
 field as it advects downglacier and evolvs thermo-mechanically
 
 Thermal model components include:
@@ -42,14 +42,14 @@ class ThermalModel():
     on ``ThermalModel`` geometry and relationship to ``IceBlock``
     This class set's up the geometry of the thermal model which differs
     ``IceBlock``. ThermalModel's horizontal ``dx`` and vertical ``dz``
-    resolution differs from IceBlock, whereby ``dx`` is equal to the 
-    diffusive lengthscale of heat through the ice (e.g., becomes a 
+    resolution differs from IceBlock, whereby ``dx`` is equal to the
+    diffusive lengthscale of heat through the ice (e.g., becomes a
     function of ice properties and model timestep). We set the horzontal
-    grid resolution of the ThermalModel equal to this value to enable 
-    thermal calculations. 
-    ``dz`` (vertical or depth) spacing can differ from ``IceBlock``, as 
-    the thermal model will run with a corser vertical resolution to save 
-    on computational expense. 
+    grid resolution of the ThermalModel equal to this value to enable
+    thermal calculations.
+    ``dz`` (vertical or depth) spacing can differ from ``IceBlock``, as
+    the thermal model will run with a corser vertical resolution to save
+    on computational expense.
 
 
     Attributes
@@ -57,8 +57,8 @@ class ThermalModel():
     dt : int, float
         thermal model timestep in seconds
     diffusive_lengthscale: float
-        distance of thermal diffusion within the ice during the 
-        thermal model's timestep, unit in meters. 
+        distance of thermal diffusion within the ice during the
+        thermal model's timestep, unit in meters.
     length : float
     ice_thickness
     dx : float, int
@@ -68,9 +68,9 @@ class ThermalModel():
     z : np.array
         z-coordinate (depth) array of model coordinates
     x : np.array
-        x-coordinates of model domain, from 0 at down-stream end 
-        of ice block, to -L at up-stream end. 
-    crevasses 
+        x-coordinates of model domain, from 0 at down-stream end
+        of ice block, to -L at up-stream end.
+    crevasses
         crevasse coorindates within model domain
     T_surface : int, float
         Temperature at ice surface in deg C.
@@ -78,8 +78,8 @@ class ThermalModel():
         Basal boundary condition used for thermal model, deg C.
         Defaults to 0 deg C
     T_upglacier : np.array
-        Temperature profile to use for upstream boundary condition 
-        of thermal model. requries temperatures in deg C with depth 
+        Temperature profile to use for upstream boundary condition
+        of thermal model. requries temperatures in deg C with depth
         from ice surface
     T : np.ndarray
         Temperature at dx, dz thorughout iceblock, deg C
@@ -97,7 +97,7 @@ class ThermalModel():
         Ice density in kg/m^3
         NOTE: future versions will allow for depth dependant densities
         for ice and snow/firn. Upon implementation accepted dtypes will
-        include np.array objects or pd.DataFrame/pd.Series objects. 
+        include np.array objects or pd.DataFrame/pd.Series objects.
     """
 
     def __init__(
@@ -130,15 +130,15 @@ class ThermalModel():
         dt_T : int, float
             thermal model timestep in seconds.
         thermal_freq : int
-            frequency thermal model is run in comparison to crevasse 
+            frequency thermal model is run in comparison to crevasse
             runs. dt * thermal_freq = dt_T
         dz : int, float:
-            vertical resolution for domain (m). Value is set to 5 m if 
-            input value is below 5 to reduce computational load. 
+            vertical resolution for domain (m). Value is set to 5 m if
+            input value is below 5 to reduce computational load.
         T_profile : pd.Series, pd.DataFrame, np.Array
-            Temperatures within ice column to set upstream boundary 
-            condition within ice block. Temperatures in deg C with 
-            corresponding depth from ice surface (m). 
+            Temperatures within ice column to set upstream boundary
+            condition within ice block. Temperatures in deg C with
+            corresponding depth from ice surface (m).
         T_surface : float, int
             Air temperature in deg C. Defaults to 0.
         T_bed : float, int
@@ -151,8 +151,8 @@ class ThermalModel():
         thermal_conductivity : optional, float
             thermal conductivity of ice in W/m/K. Defaults to 2.1
         latient_heat_of_freezing_ice : optional, float
-            latient heat of freezing for ice in kJ/kg. 
-            Defaults to 3.35e5. 
+            latient heat of freezing for ice in kJ/kg.
+            Defaults to 3.35e5.
         """
         # define constants consistant with IceBlock
         self.ice_density = ice_density
@@ -179,7 +179,7 @@ class ThermalModel():
         # crevasse info
         self.crevasses = crevasses
         self.crev_idx = self.find_crev_idx()
-        self.virtualblue = self.calc_refreezing()
+        # self.virtualblue = self.refreezing()
 
         # Boundary Conditions
         self.T_surface = T_surface if T_surface else 0
@@ -210,14 +210,14 @@ class ThermalModel():
     def _set_upstream_bc(self, Tprofile):
         """interpolate Tprofile to thermal model vertical resolution.
 
-        NOTE: elevation should be negative and ordered as 
+        NOTE: elevation should be negative and ordered as
         `[-ice_thickness:0]`
 
         Parameters
         ----------
         Tprofile : [Tuple(array, array), pd.DataFrame]
             Temperature profile data points. (temperature, elevation)
-            your array must be structured such that 
+            your array must be structured such that
 
         Returns
         -------
@@ -227,7 +227,7 @@ class ThermalModel():
         # interpolate temperature profile to match z
         if isinstance(Tprofile, pd.DataFrame):
             t, z = (1, 0) if Tprofile[Tprofile.columns[0]
-                                      ].is_monotonic else (0, 1)
+                                      ].is_monotonic_increasing else (0, 1)
             t = Tprofile[Tprofile.columns[t]].values
             z = Tprofile[Tprofile.columns[z]].values
         elif isinstance(Tprofile, Tuple):
@@ -237,8 +237,8 @@ class ThermalModel():
 
         # smooth temperature profile with a 25 m window
         win = self.dz*25+2
-        T = pd.Series(T[:win]).append(pd.Series(T).rolling(
-            win, min_periods=1, center=True).mean()[win:])
+        T = pd.concat([pd.Series(T[:win]), pd.Series(T).rolling(
+            win, min_periods=1, center=True).mean()[win:]])
 
         # apply basal temperature condition
         idx = 0 if z[0] < -1 else -1
@@ -266,7 +266,7 @@ class ThermalModel():
 
         **A** solves for future temperatures within iceblock following::
 
-            [y] = [A]^-1[b] 
+            [y] = [A]^-1[b]
 
             where A is the A matrix and b is current temperatures
             throughout ice block. Y are the temperatures at the
@@ -278,18 +278,18 @@ class ThermalModel():
         -----
         As the iceblock advects downglacier and the domain's length
         increases until reaching the specified maximum A will need
-        to be recalculated. 
+        to be recalculated.
 
         internal deformation is not currently considered
 
         Returns
         -------
         A : np.ndarray
-            square matrix with coefficients to calculate temperatures 
+            square matrix with coefficients to calculate temperatures
             within the ice block. matrix shape = nx*nz, nx*nz where
-            nx is the number of points in the x direction of the 
+            nx is the number of points in the x direction of the
             ThermalModel domain and z is the number of points in the
-            z direction. 
+            z direction.
         """
         nx = self.x.size
         # nz = self.z.size
@@ -321,7 +321,7 @@ class ThermalModel():
         nested : bool, default True
             return a nested list of crevasse indicies. If True return a
             nested list such that there is one list of indicies for
-            each crevasse. If False return a flattened list. 
+            each crevasse. If False return a flattened list.
         inplace: bool, default True
             If False, return a copy. Otherwise, do operation inplace and
             return updated class attribute.
@@ -359,7 +359,7 @@ class ThermalModel():
         """Solve for future temp w/ implicit finite difference scheme
 
         Solve for future temperatures while storing temperature fields
-        for the the previous two timesteps 
+        for the the previous two timesteps
 
         """
         setattr(self, 'Tmn1', self.T0)
@@ -393,7 +393,7 @@ class ThermalModel():
             if num+1 < len(self.crev_idx) or max(crev) > rhs.size-nx:
                 idx = [x-1 for x in crev if x < idx_surface]
                 rhs[idx] = rhs[idx] + (self.Lf / self.heat_capacity_intercept
-                                       * self.virtualblue_right) / self.dx
+                                       * self.bluelayer_right) / self.dx
 
         # adjust for air in crevasse above water level
         # need to pass water depth from crevasse to crevasse field,
@@ -407,6 +407,11 @@ class ThermalModel():
 
     def refreezing(self):
         """Find refrozen layer thickness at crevasse walls in meters.
+
+        This funtion will evaluate and update `self.bluelayer` attrs
+        and return virtualblue.
+
+
 
         The refreezing rate of meltwater depends on the horizontal
         temperature gradient in the ice of the crevasse walls dT/dx
@@ -428,25 +433,28 @@ class ThermalModel():
             virtualblue - potential refreezing rate for all z points
                 at crevasse location, therefore not limited to current
                 crevasse depth. Values passed to `IceBlock` and used by
-                `Crevasse` to find refreezing at crevasse walls as ice 
-                fractures deeper in subsequent timesteps. 
+                `Crevasse` to find refreezing at crevasse walls as ice
+                fractures deeper in subsequent timesteps.
             bluelayer - refreezing source term corresponding to actual
                 crevasse depth and water level, used to solve iceblock
                 temperatures in `.calc_temperature()`. Values internal
-                to `ThermalModel`, not used externally. 
+                to `ThermalModel`, not used externally.
+            NOTE: In both cases values are indexed from -ice_thickness
+                    (bed) to ice surface, and np.array values are
+                    listed in the order they appear in `self.crevasses`
 
         Returns
         -------
         virtualblue_l, virtualblue_r : list of np.array
-            virtualblue, refreezing rate, for all points in ice 
+            virtualblue, refreezing rate, for all points in ice
             thickness corresponding to each crevasse location. Retruns
-            list of np.arrays in the same order as `self.crevasses`. 
-            _l refers to left-hand (upglacier) side of crevasse wall and 
+            list of np.arrays in the same order as `self.crevasses`.
+            _l refers to left-hand (upglacier) side of crevasse wall and
             _r to the right-hand (downglacier) side.
             NOTE: to be usable by `Crevasse` values in virtualblue need
             to be divided by thermal frequency (e.g., current calc of
             refreezing rate is at the timestep of the thermal model) and
-            interpolated to match the z resolution of IceBlock (e.g., 
+            interpolated to match the z resolution of IceBlock (e.g.,
             calculations are currently at z-resolution of thermal model)
 
 
@@ -463,20 +471,22 @@ class ThermalModel():
         ind = round(5.6/self.dx)
 
         # initalize
-        bluelayer_l = bluelayer_r = []
-        virtualblue_l = virtualblue_r = []
+        bluelayer_l = []
+        bluelayer_r = []
+        virtualblue_left = []
+        virtualblue_right = []
 
         for num, crev in enumerate(self.crevasses):
 
             # get indicies for all z cooresponding to crevasse
-            ft_idx = np.arange(np.remainder(crev[-1], self.x.size),
-                               crev[-1], self.x.size)
+            ft_idx = np.arange(np.remainder(self.crev_idx[num][-1], self.x.size),
+                               self.crev_idx[num][-1] + self.x.size, self.x.size)
 
             # ice temp on downglacier side of crevasse (right)
             T_down = self.T.flatten()[[x + ind for x in ft_idx]]
 
             # use downglacier temperatures if domain is too small
-            T_up = self.T.flatten()[[x - ind for x in self.ft_idx]
+            T_up = self.T.flatten()[[x - ind for x in ft_idx]
                                     ] if self.x[0] >= crev[0]-5.6 else -T_down
 
             virtualblue_l = self.calc_refreezing(T_up, self.T_crev)
@@ -485,15 +495,17 @@ class ThermalModel():
             # save np.arrays to list
             bluelayer_l.append(virtualblue_l[-len(self.crev_idx[num]):])
             bluelayer_r.append(virtualblue_r[-len(self.crev_idx[num]):])
-            virtualblue_l.append(virtualblue_l)
-            virtualblue_r.append(virtualblue_r)
+
+            virtualblue_left.append(virtualblue_l)
+            virtualblue_right.append(virtualblue_r)
 
         self.bluelayer_left = bluelayer_l
         self.bluelayer_right = bluelayer_r
 
+        # save if you want to here
         # self.virtualblue = (virtualblue_l, virtualblue_r)
 
-        return virtualblue_l, virtualblue_r
+        return virtualblue_left, virtualblue_right
 
     def calc_refreezing(self,
                         T_crevasse,
@@ -515,8 +527,8 @@ class ThermalModel():
             walls respectively
         dx = the diffusion length over a year (~5 meters)
 
-        NOTE: refrozen layer thickness set to 0 if calculation yields a 
-        negative value. 
+        NOTE: refrozen layer thickness set to 0 if calculation yields a
+        negative value.
 
         Parameters
         ----------
@@ -532,9 +544,9 @@ class ThermalModel():
         Returns
         -------
         bluelayer : np.array
-            refrozen layer thickness in meters along crevasse walls for 
+            refrozen layer thickness in meters along crevasse walls for
             thermal model timestep dt, accounts for expansion of water
-            as it refreezes. 
+            as it refreezes.
 
         """
         bluelayer = self.dt * (self.ki/self.Lf/self.ice_density) * (
