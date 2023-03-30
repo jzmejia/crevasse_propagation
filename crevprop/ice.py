@@ -6,6 +6,7 @@ Copyright (c) 2021-2023 by Jessica Mejia <jzmejia@buffalo.edu>
 The main container for the crevasse propagation model, holding and
 initializing model geometry
 """
+import numpy as np
 
 
 class Ice(object):

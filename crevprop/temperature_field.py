@@ -30,7 +30,7 @@ Thermal model components include:
 import pandas as pd
 import numpy as np
 from typing import Union, Tuple
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 def flatten(nested):
@@ -106,8 +106,7 @@ class ThermalModel():
 
     def __init__(
         self,
-        ice_thickness: Union[int, float],
-        length: Union[int, float],
+        iceblock_geometry,
         dt_T: Union[int, float],
         dz: Union[int, float],
         dx: float,
@@ -166,17 +165,18 @@ class ThermalModel():
         self.heat_capacity_intercept = 2115.3
 
         # geometry
-        self.length = length
-        self.ice_thickness = ice_thickness
+        self.ibg = iceblock_geometry
+        self.length = self.ibg.length
+        self.ice_thickness = self.ibg.ice_thickness
         self.dt = dt_T
         self.dz = dz if self._ge(dz, 5) else 5
         self.dx = dx
 
         # NOTE: end of range = dx or dz to make end of array = 0
-        self.z = np.arange(-self.ice_thickness, self.dz, self.dz) if isinstance(
+        self.z = np.arange(-self.ibg.ice_thickness, self.dz, self.dz) if isinstance(
             self.dz, int) else np.arange(-self.ice_thickness, self.dz, self.dz)
         # why start at -dx-self.length?
-        self.x = x
+        self.x = self.ibg.x
 
         self.udef = udef  # defaults to 0, can be int/float/depth vector
 
@@ -203,9 +203,9 @@ class ThermalModel():
         # needs to be added at some point
         # For sovler to consider vertical ice velocity need ablation
 
-    def _diffusion_lengthscale(self):
-        """calculate the horizontal diffusion of heat through ice, m"""
-        return np.sqrt(self.kappa * self.dt)
+    # def _diffusion_lengthscale(self):
+    #     """calculate the horizontal diffusion of heat through ice, m"""
+    #     return np.sqrt(self.kappa * self.dt)
 
     def _ge(self, n, thresh):
         """greater than"""

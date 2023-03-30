@@ -13,7 +13,7 @@ from numpy import sqrt, abs
 from numpy.polynomial import Polynomial as P
 from scipy.constants import g, pi
 
-from .physical_constants import DENSITY_WATER, POISSONS_RATIO
+from .physical_constants import DENSITY_ICE, DENSITY_WATER, POISSONS_RATIO
 # from .crevasse_field import CrevasseField
 
 
@@ -162,6 +162,9 @@ class Crevasse:
         self.voltol = 1e-3
 
         Crevasse.instances.append(self)
+
+    def __iter__(self):
+        return iter(self.instances)
 
     def length(self):
         return len(self.instances)

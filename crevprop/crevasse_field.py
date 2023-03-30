@@ -36,25 +36,23 @@ class CrevasseField():
     """
 
     def __init__(self,
-                 z: np.array,
-                 dx: float,
-                 dz,
-                 dt: float,
-                 ice_thickness,
+                 geometry,
 
-                 x: np.array,
-                 length: float,
 
-                 fracture_toughness,
-                 crev_spacing: Union[int, float],
-                 max_crevs,
+
+                 fracture_toughness,    # does not change
+                 max_crevs,  # doesnt change, used for crev creation,
+                 # depends on ice velocity and how long you want
+                 # to run model/area you want to check, user defined
+
+                 comp_options,
+                 # used to define stress field
                  sigmaT0=120e3,
 
                  PFA_depth=None,
-                 blunt=False,
-                 include_creep=False,
-                 never_closed=True,
-                 water_compressive=False  # , *args, **kwargs
+
+                 # model options, for how to do calculations
+
                  ):
         """
 
@@ -106,15 +104,8 @@ class CrevasseField():
 
         """
         # model geometry and domian management
-        self.ice_thickness = ice_thickness
-        self.x = x  # will change over time
-        self.z = z
-        self.dx = dx
-        self.dz = dz
-        self.dt = dt
-        self.length = length  # will change over time
+        self.geometry = geometry
 
-        self.crev_spacing = crev_spacing
         self.max_crevs = max_crevs
 
         # ice properties
@@ -126,7 +117,7 @@ class CrevasseField():
         # Crevasse.instances e.g., self.crevasses=Crevasse.instances
         # at bottom for now make a method so that i don't need all this
         self.crevasses = self.create_crevasse()
-        self.crev_locs = [(-self.length, -0.1)]
+        self.crev_locs = [(-self.geometry.length, -0.1)]
         self.crev_count = len(self.crev_locs)  # self.crevasse_list()
 
         # temporary things needed for stress field
@@ -137,17 +128,25 @@ class CrevasseField():
         self.PFA_depth = PFA_depth
 
         # model options
-        self.blunt = blunt
-        self.include_creep = include_creep
-        self.never_closed = never_closed
-        self.water_compressive = water_compressive
+        self.comp_options = comp_options
 
         self.crev_instances = Crevasse.instances
 
     def expand_domain(self):
         pass
 
-    def propagate_fractures(self):
+    def run_through_time(self, updated_geometry):
+        # self.geometry = updated_geometry
+
+        # self.add_new_crevasse()
+        # self.find_sigma_crev()
+        # self.update_idx()
+        # self.expand_domin(new_time)
+        # for crevasse in crevasse field
+        #     crevasse.propagate_fracture(Qin,virtual_blue)
+
+        # update crevasse field with propagated crevase info
+        # return anything that is needed
         pass
 
     def crevasse_list(self):
@@ -192,10 +191,10 @@ class CrevasseField():
         # newCrev = Crevasse(self.z, self.dz, self.ice_thickness,)
         Qin = 1e-4  # zero value
         sigmaCrev = 10e4
-        Crevasse(self.z,
-                 self.dz,
-                 self.ice_thickness,
-                 self.x[0],
+        Crevasse(self.geometry.z,
+                 self.geometry.dz,
+                 self.geometry.ice_thickness,
+                 self.geometry.x[0],
                  Qin,
                  self.ice_softness,
                  sigmaCrev,
