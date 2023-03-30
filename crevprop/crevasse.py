@@ -163,11 +163,8 @@ class Crevasse:
 
         Crevasse.instances.append(self)
 
-    def __iter__(self):
-        return iter(self.instances)
-
-    def length(self):
-        return len(self.instances)
+    # def __iter__(self):
+    #     return iter(self.instances)
 
     def evolve(self, Qin, sigmaCrev):
         """evolve crevasse for new timestep and inputs

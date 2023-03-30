@@ -108,9 +108,6 @@ class ThermalModel():
         self,
         iceblock_geometry,
         dt_T: Union[int, float],
-        dz: Union[int, float],
-        dx: float,
-        x: np.array,
         crevasses,
         T_profile,
         T_surface=None,
@@ -169,14 +166,14 @@ class ThermalModel():
         self.length = self.ibg.length
         self.ice_thickness = self.ibg.ice_thickness
         self.dt = dt_T
-        self.dz = dz if self._ge(dz, 5) else 5
-        self.dx = dx
+        self.dz = self.ibg.dz if self._ge(self.ibg.dz, 5) else 5
+        self.dx = self.ibg.dx
 
         # NOTE: end of range = dx or dz to make end of array = 0
         self.z = np.arange(-self.ibg.ice_thickness, self.dz, self.dz) if isinstance(
             self.dz, int) else np.arange(-self.ice_thickness, self.dz, self.dz)
         # why start at -dx-self.length?
-        self.x = self.ibg.x
+        self.x = self.ibg.x()
 
         self.udef = udef  # defaults to 0, can be int/float/depth vector
 
@@ -488,20 +485,18 @@ class ThermalModel():
 
             # ice temp on downglacier side of crevasse (right)
             T_down = self.T.flatten()[[x + ind for x in ft_idx]]
+            T_up = self.T.flatten()[[x - ind for x in ft_idx]]
 
-            # use downglacier temperatures if domain is too small
-            T_up = self.T.flatten()[[x - ind for x in ft_idx]
-                                    ] if self.x[0] >= crev[0]-5.6 else -T_down
-
-            virtualblue_l = self.calc_refreezing(T_up, self.T_crev)
-            virtualblue_r = self.calc_refreezing(self.T_crev, T_down)
+            virblue_r = self.calc_refreezing(self.T_crev, T_down)
+            virblue_l = self.calc_refreezing(
+                T_up, self.T_crev) if self.x[0] <= crev[0]-5.6 else -virblue_r
 
             # save np.arrays to list
-            bluelayer_l.append(virtualblue_l[-len(self.crev_idx[num]):])
-            bluelayer_r.append(virtualblue_r[-len(self.crev_idx[num]):])
+            bluelayer_l.append(virblue_l[-len(self.crev_idx[num]):])
+            bluelayer_r.append(virblue_r[-len(self.crev_idx[num]):])
 
-            virtualblue_left.append(virtualblue_l)
-            virtualblue_right.append(virtualblue_r)
+            virtualblue_left.append(virblue_l)
+            virtualblue_right.append(virblue_r)
 
         self.bluelayer_left = bluelayer_l
         self.bluelayer_right = bluelayer_r

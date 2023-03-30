@@ -194,7 +194,7 @@ class CrevasseField():
         Crevasse(self.geometry.z,
                  self.geometry.dz,
                  self.geometry.ice_thickness,
-                 self.geometry.x[0],
+                 self.geometry.x()[0],
                  Qin,
                  self.ice_softness,
                  sigmaCrev,
