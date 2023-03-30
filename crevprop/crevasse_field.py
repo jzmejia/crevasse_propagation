@@ -44,7 +44,7 @@ class CrevasseField():
                  max_crevs,  # doesnt change, used for crev creation,
                  # depends on ice velocity and how long you want
                  # to run model/area you want to check, user defined
-
+                 virtualblue,
                  comp_options,
                  # used to define stress field
                  sigmaT0=120e3,
@@ -105,7 +105,7 @@ class CrevasseField():
         """
         # model geometry and domian management
         self.geometry = geometry
-
+        self.virtualblue0 = self.deconvolve_refreezing(virtualblue)
         self.max_crevs = max_crevs
 
         # ice properties
@@ -117,8 +117,8 @@ class CrevasseField():
         # Crevasse.instances e.g., self.crevasses=Crevasse.instances
         # at bottom for now make a method so that i don't need all this
         self.crevasses = self.create_crevasse()
-        self.crev_locs = [(-self.geometry.length, -0.1)]
-        self.crev_count = len(self.crev_locs)  # self.crevasse_list()
+        # self.crev_locs = [(-self.geometry.length, -0.1)]
+        # self.crev_count = len(self.crev_locs)  # self.crevasse_list()
 
         # temporary things needed for stress field
         self.sigmaT0 = sigmaT0
@@ -131,6 +131,10 @@ class CrevasseField():
         self.comp_options = comp_options
 
         self.crev_instances = Crevasse.instances
+
+    def deconvolve_refreezing(self, vb_tuple):
+        left, right = vb_tuple
+        return left[0], right[0]
 
     def expand_domain(self):
         pass
@@ -198,4 +202,5 @@ class CrevasseField():
                  Qin,
                  self.ice_softness,
                  sigmaCrev,
+                 self.virtualblue0,
                  fracture_toughness=self.fracture_toughness)

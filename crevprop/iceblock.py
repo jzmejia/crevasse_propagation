@@ -231,13 +231,6 @@ class IceBlock(Ice):
         self.max_crevs = round(
             self.ibg.u_surf/self.ibg.crev_spacing) * years_to_run
 
-        self.crev_field = CrevasseField(self.ibg,
-                                        self.fracture_toughness,
-                                        self.max_crevs,
-                                        ModelOptions(blunt, include_creep,
-                                                     never_closed, compressive)
-                                        )
-
         # temporary way to store crevasse info
         self.crev_locs = [(-self.ibg.length, -3)]
         # temporary storage for refreezing to bass back and forth
@@ -251,7 +244,15 @@ class IceBlock(Ice):
                                         thermal_diffusivity=self.kappa
                                         ) if T_profile is not None else None
 
-        #
+        self.virtualblue = self._get_virtualblue()
+
+        self.crev_field = CrevasseField(self.ibg,
+                                        self.fracture_toughness,
+                                        self.max_crevs,
+                                        self.virtualblue,
+                                        ModelOptions(blunt, include_creep,
+                                                     never_closed, compressive)
+                                        )
         self.x_advect = round(abs(self.ibg.u_surf) * self.ibg.dt, 4)
 
     def advect_domain(self):
