@@ -89,6 +89,7 @@ class Crevasse:
                  Qin,
                  ice_softness,
                  sigmaCrev,
+                 virblue,
                  name=None,
                  ice_density=917,
                  fracture_toughness=100e3,
@@ -107,7 +108,6 @@ class Crevasse:
 
 
         """
-        self.name = name
         self.z = z
         self.dz = dz
         self.ice_thickness = ice_thickness
@@ -137,7 +137,7 @@ class Crevasse:
 
         # volume of water refrozen in crevasse, curent timestep
         self.Vfrz = 0
-        self.bluelayer = np.zeros_like(self.z)
+        self.virtualblue_left, self.virtualblue_right = virblue
 
         # volume of water refrozen in crevasse, prev timestep
         self.Vfrz_prev = 0
@@ -163,11 +163,8 @@ class Crevasse:
 
         Crevasse.instances.append(self)
 
-    def __iter__(self):
-        return iter(self.instances)
-
-    def length(self):
-        return len(self.instances)
+    # def __iter__(self):
+    #     return iter(self.instances)
 
     def evolve(self, Qin, sigmaCrev):
         """evolve crevasse for new timestep and inputs

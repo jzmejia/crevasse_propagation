@@ -34,6 +34,7 @@ from .crevasse_field import CrevasseField
 
 @dataclass
 class geometry():
+    """Class for defining 2D model geometry"""
     ice_thickness: float
     dz: float
     dt: float = 0.5
@@ -218,42 +219,41 @@ class IceBlock(Ice):
         self.t = 0
         self.num_years = years_to_run
 
-        self.dt = dt * pc.SECONDS_IN_DAY
         self.thermal_freq = thermal_freq
-        self.dt_T = self._thermal_timestep(self.ibg.dt, thermal_freq)
+        self.dt_T = self._thermal_timestep(dt, thermal_freq)
 
         # ice block geometry
         self.dx = self.calc_dx(self.ibg.length)
         setattr(self.ibg, 'dx', self.dx)
 
         # crevasse field
-        # self.crevasse_spacing = crev_spacing
-
         # can multiply by int (num years to form new crevs/track for)
         self.max_crevs = round(
-            self.u_surf/self.crevasse_spacing) * years_to_run
+            self.ibg.u_surf/self.ibg.crev_spacing) * years_to_run
 
-        self.crev_field = CrevasseField(self.geometry,
+        # temporary way to store crevasse info
+        self.crev_locs = [(-self.ibg.length, -3)]
+        # temporary storage for refreezing to bass back and forth
+
+        # temperature field
+        self.temperature = ThermalModel(self.ibg, self.dt_T, self.crev_locs,
+                                        T_profile, T_surface, T_bed,
+                                        thermal_conductivity=self.ki,
+                                        ice_density=self.ice_density,
+                                        latient_heat_of_freezing_ice=self.Lf,
+                                        thermal_diffusivity=self.kappa
+                                        ) if T_profile is not None else None
+
+        self.virtualblue = self._get_virtualblue()
+
+        self.crev_field = CrevasseField(self.ibg,
                                         self.fracture_toughness,
                                         self.max_crevs,
+                                        self.virtualblue,
                                         ModelOptions(blunt, include_creep,
                                                      never_closed, compressive)
                                         )
-
-        # temporary way to store crevasse info
-        self.crev_locs = [(-self.length, -3)]
-        # temporary storage for refreezing to bass back and forth
-        # self.bluelayer = self.crevasses.bluelayer
-
-        # temperature field
-        self.temperature = self._init_temperatures(T_profile,
-                                                   T_surface,
-                                                   T_bed)
-
-        # stress field
-
-        #
-        self.x_advect = round(abs(self.u_surf) * self.dt, 4)
+        self.x_advect = round(abs(self.ibg.u_surf) * self.ibg.dt, 4)
 
     def advect_domain(self):
         """increase domain length to allow crevasses to move downstream
@@ -367,59 +367,11 @@ class IceBlock(Ice):
 
         return virtualblue_left, virtualblue_right
 
-    def _init_temperatures(self,
-                           T_profile,
-                           T_surface,
-                           T_bed
-                           ):
-        return None if isinstance(T_profile, type(None)) else ThermalModel(
-            self.ice_thickness,
-            self.length,
-            self.dt_T,
-            self.dz,
-            self.dx,
-            self.x,
-            self.crev_locs,
-            T_profile,
-            T_surface,
-            T_bed,
-            thermal_conductivity=self.ki,
-            ice_density=self.ice_density,
-            latient_heat_of_freezing_ice=self.Lf,
-            thermal_diffusivity=self.kappa
-        )
-
-    # def _init_crevfield(self,
-    #                     blunt,
-    #                     include_creep,
-    #                     never_closed,
-    #                     water_compressive
-    #                     ):
-    #     """Initialize CrevasseField for given model geometry"""
-    #     crevasse_field = CrevasseField(self.z,
-    #                                    self.dx,
-    #                                    self.dz,
-    #                                    self.dt,
-    #                                    self.ice_thickness,
-    #                                    self.x,
-    #                                    self.length,
-
-    #                                    self.fracture_toughness,
-    #                                    self.crevasse_spacing,
-    #                                    self.max_crevs,
-
-    #                                    blunt=blunt,
-    #                                    include_creep=include_creep,
-    #                                    never_closed=never_closed,
-    #                                    water_compressive=water_compressive
-    #                                    )
-    #     return crevasse_field
-
     def _thermal_timestep(self, timestep, thermal_freq):
         if round(365 % (timestep*thermal_freq)) != 0:
             raise ValueError(
                 "thermal_freq must divide 365 evenly")
-        return round(self.dt * thermal_freq)
+        return round(self.ibg.dt * thermal_freq)
 
     def diffusion_length(self):
         """diffusion lengthscale for thermal model timestep dt_T"""
