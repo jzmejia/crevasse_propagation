@@ -1,189 +1,93 @@
 """
+Copyright (c) 2021-2023 by Jessica Mejia <jzmejia@buffalo.edu>
+
+
+
 The main container for the crevasse propagation model, holding and
 initializing model geometry
 """
 import numpy as np
-from numpy.lib.function_base import diff
-from numpy import sqrt, abs
-from numpy.polynomial import Polynomial as P
-from scipy.constants import g, pi
+# from numpy.lib.function_base import diff
+from numpy import abs
+# from numpy.polynomial import Polynomial as P
+# from scipy.constants import g, pi
+
+from dataclasses import dataclass
+
 
 import math as math
+from dataclasses import dataclass
 # import pandas as pd
 from typing import (
     Dict,
     List,
-    Any
+    Any,
+    Optional,
+    Union
 )
 
+from .ice import Ice
 from .temperature_field import ThermalModel
 from . import physical_constants as pc
-from .crevasse import CrevasseField, Crevasse
+from .crevasse_field import CrevasseField
 
 
-class Ice(object):
-    """Material properties of ice
+@dataclass
+class geometry():
+    ice_thickness: float
+    dz: float
+    dt: float = 0.5
+    u_surf: float = 100.
+    crev_spacing: int = 30
+    length: float = None
+    dx: float = None
+
+    def __post_init__(self):
+        """add and update calculated attributes 
+        """
+        self.length = self.crev_spacing + self.u_surf
+        self.dt = self.dt * pc.SECONDS_IN_DAY
+        self.u_surf = self.u_surf / pc.SECONDS_IN_YEAR
+
+    def z(self) -> np.array:
+        """1D array defining the vertical (z-direction) axis (m)"""
+        return np.arange(-self.ice_thickness, self.dz, self.dz)
+
+    def x(self) -> np.array:
+        """1D array defining the horizontal (x-direction) axis (m)"""
+        return np.arange(-self.length, self.dx, self.dx)
+
+
+@dataclass
+class ModelOptions:
+    """Class for keeping track of options for crev prop calc
+
 
     Parameters
     ----------
-
-
-    Attributes
-    ----------
-    density:
-    T: float, int
-        ice temperature in degrees Celcius
+        blunt : bool, by default False
+            whether to blunt the stresses on individual crevasses, used
+            with creep calculation and sets sigmaTcrev=0 for 
+            interior crevasses within crevasse field, by default False
+        include_creep : bool, bydefault False
+            consider creep closure in model, by default False
+            NOTE: creep not yet supported by model due to data input 
+            requirements
+        never_closed : bool, by default True
+            always allow melt into the crevasse regardless of 
+            near-surface pintching. This only affects the Qin calc.
+            by default True.
+        water_compressive : bool, by default False
+            whether to allow water into crevasse when the longitudinal 
+            stress on the crevasse is negative (compressive stress 
+            regeime). If false, don't allow water into crevasse if in a
+            compressive regeime. This affects the Qin calculation. 
+            by default False
     """
-
-    def __init__(self,
-                 ice_density=917.,
-                 ice_temperature=0,
-                 fracture_toughness=100e3):
-        """_summary_
-
-        Parameters
-        ----------
-        density : int, optional
-            ice denisty in kg/m^3, by default 917 kg/m^3
-        temperature : int, optional
-            ice temperature in degrees Celsius, by default 0C
-        fracture_toughness : float, optional
-            fracture toughness of ice in Pa, by default 0.1 MPa
-        """
-
-        self.ice_density = ice_density
-        self.ice_temperature = ice_temperature
-
-        self.specific_heat_capacity = 2097
-        self.heat_capacity_intercept = 2115.3
-        self.heat_capacity_slope = 7.79293
-
-        # note: thermal conductivity at 0 deg C unit W/mK
-        self.thermal_conductivity = self.ki = 2.1
-
-        self.latient_heat_of_freezing = self.Lf = 3.35e5
-        self.kappa = self.thermal_diffusivity()
-        self.units = self._set_unit()
-
-        self.fracture_toughness = fracture_toughness
-
-    def C_to_K(self, C):
-        """Convert temperature in degrees Celsius to Kelvin"""
-        return C + 273.15
-
-    def calc_specific_heat_capacity(self, T):
-        """specific heat capacity for pure ice (J/kg/K)
-
-        Specific heat capacity, c, per unit mass of ice in SI units.
-        Note: c of dry snow and ice does not vary with density
-        because the heat needed to warm the air and vapor between
-        grains is neglibible. (see Cuffey, ch 9, pp 400)
-
-        c = 152.5 + 7.122(T)
-
-        Parameters
-        ----------
-        T: float
-            ice temperature in degrees Celcius
-
-        Returns
-        -------
-        c: float
-            specific heat capacity of ice in Jkg^-1K^-1
-
-        """
-        return 152.5 + 7.122 * self.C_to_K(T)
-
-    def thermal_conductivity_pure_ice(self, T=0):
-        return 9.828 * np.exp(-5.7e-3 * self.C_to_K(T))
-
-    def van_dusen(self, density):
-        """Depth dependant thermal conductivity for dry snow, firn, ice
-        Van Dusen (1929)
-
-        This equation typically gives a lower limit in most cases
-
-        Parameters
-        ----------
-        density : (float)
-            density of dry snow, firn, or glacier ice in kg/m^3
-
-        """
-        return 2.1e-2 + 4.2e-4 * density + 2.2e-9 * density**3
-
-    def schwerdtfeger(self, density):
-        # density must be less than the density of pure ice,
-        # find threshold to use here
-        pure_ice = self.thermal_conductivity_pure_ice
-        pass
-
-    def thermal_conductivitiy_firn(self, x, relationship="density"):
-        """calculate thermal conductivity of firn
-
-        This function implements the depth or density dependant
-        empirical relationships described by Oster and Albert (2022).
-
-        Use the density relation for depths from 0-48 m. When the
-        the density of pure ice is entered into this equation a thermal
-        conductivity `k_{firn}(p_ice)=2.4` W/mK which is the known
-        thermal conductivity of pure ice at -25 deg C.
-
-        The depth dependant relationship predicts the thermal
-        conductivity of pure ice for depths around 100-110 m. This is
-        consistant with the field-measured depth of the firn-ice
-        transitions.
-
-        Parameters
-        ----------
-        x : float
-            density or depth used in calculation. Must correspond to
-            choice of relationship.
-        relationship : str, optional
-            must be "density" or "depth", by default "density"
-        """
-        # function of density vs function of depth
-        if relationship == "density":
-            k_firn = 0.144 * np.exp(0.00308 * x)
-        elif relationship == "depth":
-            k_firn = 0.536 * np.exp(0.0144 * x)
-        return k_firn
-
-    def calc_thermal_conductivity(self, T=0, density=917, method="empirical"):
-        """calc thermal conductivy using specified method"""
-        if method == "van_dusen":
-            kt = self.van_dusen(density)
-        elif method == "schwerdtfeger":
-            kt = 1
-        elif method == "empirical":
-            kt = self.thermal_conductivity_pure_ice(T)
-
-        return kt
-
-    def thermal_diffusivity(self):
-        """calculate thermal diffusivity
-
-        thermal_conductivity / density * specific_heat_capacity
-
-
-        Returns
-        -------
-        thermal diffusivity with units of m^2/s
-        """
-        return self.thermal_conductivity / (
-            self.ice_density * self.specific_heat_capacity)
-
-    def _set_unit(self):
-        units = {
-            'density': 'kg/m^3',
-            'thermal conductivity': 'J/m/K/s',
-            'thermal diffusivity': 'm^2/s',
-            'latient heat of freezing': 'J/kg',
-            'heat capacity': 'J/kg/K',
-            'melting point at 1 atm': 'K',
-            'fracture toughness': 'MPa m^-1/2',
-            'driving stress': 'kPa'
-        }
-        return units
+    blunt: bool = False
+    include_creep: bool = False
+    never_closed: bool = True
+    water_compressive: bool = False
 
 
 class IceBlock(Ice):
@@ -254,6 +158,7 @@ class IceBlock(Ice):
         ice_thickness,
         dz,
         dt=0.5,
+        years_to_run=2,
         thermal_freq=2,
         crev_spacing=30,
         T_profile=None,
@@ -265,7 +170,7 @@ class IceBlock(Ice):
         blunt=False,
         include_creep=False,
         never_closed=True,
-        water_compressive=False
+        compressive=False
     ):
         """
         Parameters
@@ -306,37 +211,35 @@ class IceBlock(Ice):
         """
 
         super().__init__(ice_density, fracture_toughness)
+        self.ibg = geometry(ice_thickness, dz, dt, u_surf, crev_spacing)
 
         # time domain
         # initialize model to time=0
         self.t = 0
+        self.num_years = years_to_run
+
         self.dt = dt * pc.SECONDS_IN_DAY
         self.thermal_freq = thermal_freq
-        self.dt_T = self._thermal_timestep(dt, thermal_freq)
+        self.dt_T = self._thermal_timestep(self.ibg.dt, thermal_freq)
 
         # ice block geometry
-        self.length = self.calc_length(u_surf, 1, crev_spacing)
-        self.dx = self.calc_dx()
-        # why is this starting at -length-dx?
-        # self.x = np.arange(-self.dx-self.length, self.dx, self.dx)
-        # changing back to starting at -length - 3/21/2023
-        self.x = np.arange(-self.length, self.dx, self.dx)
-
-        self.ice_thickness = ice_thickness
-        self.dz = dz
-        self.z = np.arange(-self.ice_thickness, self.dz, self.dz)
-
-        # ice velocity
-        self.u_surf = u_surf / pc.SECONDS_IN_YEAR
+        self.dx = self.calc_dx(self.ibg.length)
+        setattr(self.ibg, 'dx', self.dx)
 
         # crevasse field
-        self.crevasse_spacing = crev_spacing
+        # self.crevasse_spacing = crev_spacing
+
         # can multiply by int (num years to form new crevs/track for)
-        self.max_crevs = round(self.u_surf/self.crevasse_spacing)
-        self.crevasse_field = self._init_crevfield(blunt,
-                                                   include_creep,
-                                                   never_closed,
-                                                   water_compressive)
+        self.max_crevs = round(
+            self.u_surf/self.crevasse_spacing) * years_to_run
+
+        self.crev_field = CrevasseField(self.geometry,
+                                        self.fracture_toughness,
+                                        self.max_crevs,
+                                        ModelOptions(blunt, include_creep,
+                                                     never_closed, compressive)
+                                        )
+
         # temporary way to store crevasse info
         self.crev_locs = [(-self.length, -3)]
         # temporary storage for refreezing to bass back and forth
@@ -352,13 +255,84 @@ class IceBlock(Ice):
         #
         self.x_advect = round(abs(self.u_surf) * self.dt, 4)
 
-    # def get_length(self):
-    #     pass
+    def advect_domain(self):
+        """increase domain length to allow crevasses to move downstream
 
-    # def set_length(self):
-    #     # if hasattr(self,"length"):
+        For the model's timestep `dt` and user-defined ice velocity
+        `u_surf` allow the 2-D model domain to expand in length by
+        adding ice at the up-stream boundary.
 
-    #     pass
+        `IceBlock` attributes are modified by this function
+        `.length` increases by the distance advected in each timestep
+        `.x` will reflect new domain length [-length,dx,0]
+        """
+
+        # TODO! because xadvect can be smaller than dx, calculate di
+        # from cumulative timestep counter n, and subtract added, the
+        # tracker of how much the domain has grown over model run
+        # added will need to be initalized before this
+        # n will need to be initialized outside or given to function
+
+        # di = round(n * self.x_advect / self.dx) - added
+
+        # add conditional for if di >= dx, if not, don't add anything
+        # recalculate length
+        # recalculate x
+
+        # setattr(ibg, 'x', value)
+
+        # reassign ice surface temperature if variable
+        # recalculate T/update thermal model
+        # track crevasse location (downglacier-most)
+
+        # detach domain if necessary
+        # update thermal model upglacier boundary condition req
+
+        # update u and v velocity profiles if applicable
+
+        pass
+
+    def increment_time(self):
+        """run model for one timestep
+
+
+
+        1. Update IceBlock geometry
+        2. Find new 
+
+
+        """
+
+        # 1. advect domain
+        # update IceBlock geometry
+
+        # update crevasse field geometry
+        # self.crevasse_field.run_through_time(input what is needed)
+        # find Qin to use in this timestep
+        # execute fracture mechanics scheme
+        #
+
+        pass
+
+    def update_temperatures(self):
+        # for timesteps at the thermal model frequency calculate
+        # temperatures for iceblock
+
+        # 1. update thermal model geometry to match iceblock
+        # 2. reassign/update crevasse locations in thermal model
+        # 3. execute model `ThermalModel.calc_temperature()`
+        # 4. recalculate refreezing
+        #       this updates ThermalModel instance with new bluelayer
+        #       values that will be used in the next temperature calc
+        #       and returns the new virtualblue that needs to go to
+        #       crevasses for their calculation in next timesteps
+
+        # REFREEZING NEEDS TO BE PASSED TO CREVASSE FIELD
+
+        pass
+
+    def propagate_fractures(self):
+        pass
 
     def _get_virtualblue(self):
         """gets and adjust refreezing values from ThermalModel
@@ -385,30 +359,13 @@ class IceBlock(Ice):
             rhs = virtualblue_r[num]/self.thermal_freq
 
             if self.dx != self.temperature.dx:
-                lhs = np.interp(self.z, self.temperature.z, lhs)
-                rhs = np.interp(self.z, self.temperature.z, rhs)
+                lhs = np.interp(self.ibg.z, self.temperature.z, lhs)
+                rhs = np.interp(self.ibg.z, self.temperature.z, rhs)
 
             virtualblue_left.append(lhs)
             virtualblue_right.append(rhs)
 
         return virtualblue_left, virtualblue_right
-
-    def _init_geometry(self):
-        """initialize ice block geometry
-
-        Return
-        ------
-        x : np.array
-            1-D array defining the horizontal (x-direction)
-            [-dx - length : dx : 0]
-        z : np.array
-            1-D array defining the vertical (z-direction)
-            [0 : dz : ice_thickness]
-
-        """
-        x = np.arange(-self.dx-self.length, self.dx, self.dx)
-        z = np.arange(-self.ice_thickness, self.dz, self.dz)
-        return x, z
 
     def _init_temperatures(self,
                            T_profile,
@@ -432,29 +389,31 @@ class IceBlock(Ice):
             thermal_diffusivity=self.kappa
         )
 
-    def _init_crevfield(self,
-                        blunt,
-                        include_creep,
-                        never_closed,
-                        water_compressive
-                        ):
-        """Initialize CrevasseField for given model geometry"""
-        crevasse_field = CrevasseField(self.z,
-                                       self.dx,
-                                       self.dz,
-                                       self.dt,
-                                       self.ice_thickness,
-                                       self.x,
-                                       self.length,
-                                       self.fracture_toughness,
-                                       self.crevasse_spacing,
-                                       self.max_crevs,
-                                       blunt=blunt,
-                                       include_creep=include_creep,
-                                       never_closed=never_closed,
-                                       water_compressive=water_compressive
-                                       )
-        return crevasse_field
+    # def _init_crevfield(self,
+    #                     blunt,
+    #                     include_creep,
+    #                     never_closed,
+    #                     water_compressive
+    #                     ):
+    #     """Initialize CrevasseField for given model geometry"""
+    #     crevasse_field = CrevasseField(self.z,
+    #                                    self.dx,
+    #                                    self.dz,
+    #                                    self.dt,
+    #                                    self.ice_thickness,
+    #                                    self.x,
+    #                                    self.length,
+
+    #                                    self.fracture_toughness,
+    #                                    self.crevasse_spacing,
+    #                                    self.max_crevs,
+
+    #                                    blunt=blunt,
+    #                                    include_creep=include_creep,
+    #                                    never_closed=never_closed,
+    #                                    water_compressive=water_compressive
+    #                                    )
+    #     return crevasse_field
 
     def _thermal_timestep(self, timestep, thermal_freq):
         if round(365 % (timestep*thermal_freq)) != 0:
@@ -466,68 +425,33 @@ class IceBlock(Ice):
         """diffusion lengthscale for thermal model timestep dt_T"""
         return np.sqrt(self.kappa * self.dt_T)
 
-    def calc_dx(self):
+    def calc_dx(self, length):
         """calculate model dx from diffusion lengthscale"""
-        return (0.5 * self.length)/round(0.5 * self.length
-                                         / self.diffusion_length())
+        return (0.5 * length)/round(0.5 * length
+                                    / self.diffusion_length())
 
-    def advect_domain(self):
-        """increase domain length to allow crevasses to move downstream
+    # def calc_length(self, usurf, crev_count, crev_spacing):
+    #     """Calculate initial length of ice block using class init args.
 
-        For the model's timestep `dt` and user-defined ice velocity
-        `u_surf` allow the 2-D model domain to expand in length by
-        adding ice at the up-stream boundary.
+    #     ice block created to initially have 1 year of ice at the
+    #     downstream end of the ice block ahead of the first crevasse's
+    #     location. This is specified to keep the crevasse cold. Otherwise
+    #     the downstream boundary condition becomes diffusively influenced
+    #     by the downstream-most crevasse.
 
-        `IceBlock` attributes are modified by this function
-        `.length` increases by the distance advected in each timestep
-        `.x` will reflect new domain length [-length,dx,0]
-        """
+    #     condition: if model is run from t=0 and no crevasses exist the
+    #     ice block length will just be the 1 year of ice ahead of the
+    #     first crev. If class initialized for a pre-existing crevasse
+    #     field the length depends on the number of crevasses and spacing
+    #     of the crevasse field in addition to the one year of ice at the
+    #     downstream end.
 
-        # TODO! because xadvect can be smaller than dx, calculate di
-        # from cumulative timestep counter n, and subtract added, the
-        # tracker of how much the domain has grown over model run
-        # added will need to be initalized before this
-        # n will need to be initialized outside or given to function
+    #     Parameters
+    #     ----------
+    #     usurf : float, int
+    #     crev_count : int
+    #     crev_spacing  : int
 
-        # di = round(n * self.x_advect / self.dx) - added
-
-        # add conditional for if di >= dx, if not, don't add anything
-        # recalculate length
-        # recalculate x
-
-        # reassign ice surface temperature if variable
-        # recalculate T/update thermal model
-        # track crevasse location (downglacier-most)
-
-        # detach domain if necessary
-        # update thermal model upglacier boundary condition req
-
-        # update u and v velocity profiles if applicable
-
-        pass
-
-    def calc_length(self, usurf, crev_count, crev_spacing):
-        """Calculate initial length of ice block using class init args.
-
-        ice block created to initially have 1 year of ice at the
-        downstream end of the ice block ahead of the first crevasse's
-        location. This is specified to keep the crevasse cold. Otherwise
-        the downstream boundary condition becomes diffusively influenced
-        by the downstream-most crevasse.
-
-        condition: if model is run from t=0 and no crevasses exist the
-        ice block length will just be the 1 year of ice ahead of the
-        first crev. If class initialized for a pre-existing crevasse
-        field the length depends on the number of crevasses and spacing
-        of the crevasse field in addition to the one year of ice at the
-        downstream end.
-
-        Parameters
-        ----------
-        usurf : float, int
-        crev_count : int
-        crev_spacing  : int
-
-        """
-        crev_count = crev_count if crev_count else 1
-        return crev_count * crev_spacing + usurf
+    #     """
+    #     crev_count = crev_count if crev_count else 1
+    #     return crev_count * crev_spacing + usurf
