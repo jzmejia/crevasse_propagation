@@ -253,9 +253,9 @@ class IceBlock(Ice):
                                         ModelOptions(blunt, include_creep,
                                                      never_closed, compressive)
                                         )
-        self.x_advect = round(abs(self.ibg.u_surf) * self.ibg.dt, 4)
+        self.xmove = round(abs(self.ibg.u_surf) * self.ibg.dt, 4)
 
-    def advect_domain(self):
+    def advect_domain(self, t):
         """increase domain length to allow crevasses to move downstream
 
         For the model's timestep `dt` and user-defined ice velocity
@@ -267,7 +267,7 @@ class IceBlock(Ice):
         `.x` will reflect new domain length [-length,dx,0]
         """
 
-        # TODO! because xadvect can be smaller than dx, calculate di
+        # TODO! because xmove can be smaller than dx, calculate di
         # from cumulative timestep counter n, and subtract added, the
         # tracker of how much the domain has grown over model run
         # added will need to be initalized before this

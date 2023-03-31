@@ -195,7 +195,7 @@ class CrevasseField():
         # newCrev = Crevasse(self.z, self.dz, self.ice_thickness,)
         Qin = 1e-4  # zero value
         sigmaCrev = 10e4
-        Crevasse(self.geometry.z,
+        Crevasse(self.geometry.z(),
                  self.geometry.dz,
                  self.geometry.ice_thickness,
                  self.geometry.x()[0],
