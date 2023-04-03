@@ -166,6 +166,11 @@ class Crevasse:
     # def __iter__(self):
     #     return iter(self.instances)
 
+    def set_virtualblue(self, ib_virblue):
+        left, right = ib_virblue
+
+        pass
+
     def evolve(self, Qin, sigmaCrev):
         """evolve crevasse for new timestep and inputs
 
