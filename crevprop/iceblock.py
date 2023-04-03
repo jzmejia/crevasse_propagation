@@ -255,6 +255,8 @@ class IceBlock(Ice):
                                         )
         self.xmove = round(abs(self.ibg.u_surf) * self.ibg.dt, 4)
 
+        self.detached = False
+
     def advect_domain(self, t):
         """increase domain length to allow crevasses to move downstream
 
@@ -266,6 +268,10 @@ class IceBlock(Ice):
         `.length` increases by the distance advected in each timestep
         `.x` will reflect new domain length [-length,dx,0]
         """
+
+        # 1. if domain is detached from upglacier boundary
+        # set downstream BC based on the month/season using history
+        # from the previous year's runs
 
         # TODO! because xmove can be smaller than dx, calculate di
         # from cumulative timestep counter n, and subtract added, the
