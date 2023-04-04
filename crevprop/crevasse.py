@@ -116,17 +116,23 @@ class Crevasse:
         self.fracture_toughness = fracture_toughness
         self.mu = ice_softness
         self.ice_density = ice_density
+        
         # self.flotation_depth = (1-self.ice_density/1000) * self.ice_thickness
 
         # sigmaCrev = stress applied to/felt by crevasse
         self.sigmaCrev = sigmaCrev
 
+
+        # dynamic, set initial crev conditions
         self.depth = 0.1
         self.volume = 1e-4
+        
+        
         # water-filled crevasse
         self.Qin = Qin
         # self.Vmelt = 0
         # self.Vpfa = 0
+        
         self.Vwater = 1e-4
         # depth = distance from ice surface to water surface in crevasse
         self.water_depth = 0
@@ -153,8 +159,8 @@ class Crevasse:
         self.closed = False
 
         self.FTHF = False  # full thickness hydrofracture achieved?
-
         self.alpha = self.calc_alpha(mode=1)
+        
 
         # tolerance for viscoelastic crevasse extension
         self.ztol = 1e-3  # m depth tolerance for
@@ -195,7 +201,7 @@ class Crevasse:
         Vwater = Qin
 
         if Vwater > 1e-4 & self.depth < (self.ice_thickness - 10):
-            morph = self.crevmorph(Qin)
+            self.crevmorph(Qin)
 
         elif self.depth >= (self.ice_thickness - 10):
             # do nothing fracture mechanics related but set water level
@@ -434,6 +440,11 @@ class Crevasse:
         ----------
         crevasse_depth : float
             crevasse depth in meters. 
+        
+        Returns
+        -------
+        float
+            water depth in meters from the ice surface
         """
 
         if crevasse_depth >= 30:

@@ -37,9 +37,10 @@ class geometry():
     """Class for defining 2D model geometry"""
     ice_thickness: float
     dz: float
-    dt: float = 0.5
-    u_surf: float = 100.
-    crev_spacing: int = 30
+    dt: float
+    u_surf: float
+    crev_spacing: int
+    xmove: float = None
     length: float = None
     dx: float = None
 
@@ -49,11 +50,14 @@ class geometry():
         self.length = self.crev_spacing + self.u_surf
         self.dt = self.dt * pc.SECONDS_IN_DAY
         self.u_surf = self.u_surf / pc.SECONDS_IN_YEAR
+        self.xmove = np.abs(self.u_surf) * self.dt
 
+    @property
     def z(self) -> np.array:
         """1D array defining the vertical (z-direction) axis (m)"""
         return np.arange(-self.ice_thickness, self.dz, self.dz)
 
+    @property
     def x(self) -> np.array:
         """1D array defining the horizontal (x-direction) axis (m)"""
         return np.arange(-self.length, self.dx, self.dx)
@@ -165,7 +169,7 @@ class IceBlock(Ice):
         T_profile=None,
         T_surface=None,
         T_bed=None,
-        u_surf=100.,
+        u_surf=200.,
         fracture_toughness=100e3,
         ice_density=917,
         blunt=False,
@@ -217,6 +221,8 @@ class IceBlock(Ice):
         # time domain
         # initialize model to time=0
         self.t = 0
+        self.time = 0
+        # self.doy = 1
         self.num_years = years_to_run
 
         self.thermal_freq = thermal_freq
