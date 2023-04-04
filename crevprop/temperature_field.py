@@ -166,14 +166,14 @@ class ThermalModel():
         self.length = self.ibg.length
         self.ice_thickness = self.ibg.ice_thickness
         self.dt = dt_T
-        self.dz = self.ibg.dz if self._ge(self.ibg.dz, 5) else 5
+        self.dz = self.ibg.dz if self.ibg.dz >= 5 else 5
         self.dx = self.ibg.dx
 
         # NOTE: end of range = dx or dz to make end of array = 0
         self.z = np.arange(-self.ibg.ice_thickness, self.dz, self.dz) if isinstance(
             self.dz, int) else np.arange(-self.ice_thickness, self.dz, self.dz)
         # why start at -dx-self.length?
-        self.x = self.ibg.x()
+        self.x = self.ibg.x
 
         self.udef = udef  # defaults to 0, can be int/float/depth vector
 
@@ -204,9 +204,7 @@ class ThermalModel():
     #     """calculate the horizontal diffusion of heat through ice, m"""
     #     return np.sqrt(self.kappa * self.dt)
 
-    def _ge(self, n, thresh):
-        """greater than"""
-        return True if n >= thresh else False
+
 
     def _set_upstream_bc(self, Tprofile):
         """interpolate Tprofile to thermal model vertical resolution.
