@@ -30,7 +30,6 @@ Thermal model components include:
 import pandas as pd
 import numpy as np
 from typing import Union, Tuple
-# import matplotlib.pyplot as plt
 
 
 def flatten(nested):
@@ -154,6 +153,7 @@ class ThermalModel():
             latient heat of freezing for ice in kJ/kg.
             Defaults to 3.35e5.
         """
+
         # define constants consistant with IceBlock
         self.ice_density = ice_density
         self.ki = thermal_conductivity
@@ -164,18 +164,13 @@ class ThermalModel():
         # geometry
         self.ibg = iceblock_geometry
         self.length = self.ibg.length
-        self.ice_thickness = self.ibg.ice_thickness
         self.dt = dt_T
         self.dz = self.ibg.dz if self.ibg.dz >= 5 else 5
-        self.dx = self.ibg.dx
 
-        # NOTE: end of range = dx or dz to make end of array = 0
         self.z = np.arange(-self.ibg.ice_thickness, self.dz, self.dz) if isinstance(
-            self.dz, int) else np.arange(-self.ice_thickness, self.dz, self.dz)
-        # why start at -dx-self.length?
-        self.x = self.ibg.x
+            self.dz, int) else np.arange(-self.ibg.ice_thickness, self.dz, self.dz)
 
-        self.udef = udef  # defaults to 0, can be int/float/depth vector
+        self.udef = udef
 
         # crevasse info
         self.crevasses = crevasses
@@ -187,7 +182,8 @@ class ThermalModel():
         self.T_bed = T_bed if T_bed else 0
         self.T_upglacier = self._set_upstream_bc(T_profile)
         # left = upglacier end, right = downglacier
-        self.T = np.outer(self.T_upglacier, np.linspace(1, 0.99, self.x.size))
+        self.T = np.outer(self.T_upglacier, np.linspace(
+            1, 0.99, self.ibg.x.size))
         self.T_downglacier = self.T[:, -1]
         self.T_crev = 0
 
@@ -199,12 +195,6 @@ class ThermalModel():
         # For solver to consider horizontal ice velocity a udef term
         # needs to be added at some point
         # For sovler to consider vertical ice velocity need ablation
-
-    # def _diffusion_lengthscale(self):
-    #     """calculate the horizontal diffusion of heat through ice, m"""
-    #     return np.sqrt(self.kappa * self.dt)
-
-
 
     def _set_upstream_bc(self, Tprofile):
         """interpolate Tprofile to thermal model vertical resolution.
@@ -235,7 +225,7 @@ class ThermalModel():
         T = np.interp(self.z, z, t)
 
         # smooth temperature profile with a 25 m window
-        win = self.dz*25+2
+        win = self.dz*25 + 2
         T = pd.concat([pd.Series(T[:win]), pd.Series(T).rolling(
             win, min_periods=1, center=True).mean()[win:]])
 
@@ -247,7 +237,7 @@ class ThermalModel():
 
     def df(self):
         """return pandas DataFrame object of Temperature Field"""
-        return pd.DataFrame(data=self.T, index=self.z, columns=np.round(self.x))
+        return pd.DataFrame(data=self.T, index=self.z, columns=np.round(self.ibg.x))
 
     def t_resample(self, dz):
         """resample temperatures to match z resolution"""
@@ -255,10 +245,6 @@ class ThermalModel():
             T = self.Tdf[self.Tdf.index.isin(self.z[::dz].tolist())].values
         # ToDo add else statement/another if statement
         return T
-
-    # def _calc_thermal_diffusivity(self):
-
-    #     return
 
     def A_matrix(self):
         """Physical coefficient matrix defining heat transfer properties
@@ -290,11 +276,11 @@ class ThermalModel():
             ThermalModel domain and z is the number of points in the
             z direction.
         """
-        nx = self.x.size
+        nx = self.ibg.x.size
         # nz = self.z.size
 
-        sx = self.kappa * self.dt / self.dx ** 2
-        sz = self.kappa * self.dt / self.dz ** 2
+        sx = self.kappa*self.dt / self.ibg.dx**2
+        sz = self.kappa*self.dt / self.dz**2
 
         # Apply crevasse location boundary conditions to A
         crev_idx = self.find_crev_idx(nested=False)
@@ -305,10 +291,10 @@ class ThermalModel():
         # internal deformation (horizontal )
         for i in range(nx, self.T.size - nx):
             if i % nx != 0 and i % nx != nx-1 and i not in crev_idx:
-                A[i, i] = 1 + 2*sx + 2*sz - self.dt/self.dx * self.udef
+                A[i, i] = 1 + 2*sx + 2*sz - self.dt/self.ibg.dx*self.udef
                 A[i, i-nx] = A[i, i+nx] = -sz
                 A[i, i-1] = -sx
-                A[i, i+1] = -sx + self.dt / self.dx * self.udef
+                A[i, i+1] = -sx + self.dt/self.ibg.dx*self.udef
 
         return A
 
@@ -330,31 +316,29 @@ class ThermalModel():
             crev_idx : list of crevasse indicies within thermal model
         '''
         crev_idx = []
+        nx = self.ibg.x.size
 
         for crev in self.crevasses:
-
             # crevasse index at ice surface
-            crev_x = (self.x.size * self.z.size - 1) - \
-                abs(round(crev[0]/self.dx))
+            crev_x = (nx * self.z.size - 1) - \
+                abs(round(crev[0]/self.ibg.dx))
 
             # index at crevasse tip (on thermal model grid)
             if abs(crev[1]) >= 2*self.dz:
-                crevtip = crev_x-(abs(np.floor(crev[1]/self.dz))-1)*self.x.size
+                crevtip = crev_x - (abs(np.floor(crev[1]/self.dz))-1)*nx
             else:
-                crevtip = crev_x-(abs(np.floor(crev[1]/self.dz))) * self.x.size
+                crevtip = crev_x - (abs(np.floor(crev[1]/self.dz))) * nx
 
             # TODO add in error if crev depth > ice thickness
 
-            idx = np.arange(crevtip, crev_x + self.x.size,
-                            self.x.size, dtype=int).tolist()
-
+            idx = np.arange(crevtip, crev_x+nx, nx, dtype=int).tolist()
             crev_idx.append(idx)
 
         self.crev_idx = crev_idx
 
         return crev_idx if nested else flatten(crev_idx)
 
-    def calc_temperature(self):
+    def calc_temperature(self, updated_crevasses=None):
         """Solve for future temp w/ implicit finite difference scheme
 
         Solve for future temperatures while storing temperature fields
@@ -364,7 +348,10 @@ class ThermalModel():
         setattr(self, 'Tmn1', self.T0)
         setattr(self, 'T0', self.T)
 
-        nx = self.x.size
+        if updated_crevasses:
+            setattr(self, 'crevasses', updated_crevasses)
+
+        nx = self.ibg.x.size
         crev_idx = self.find_crev_idx(nested=False)
 
         A = self.A_matrix()
@@ -384,15 +371,15 @@ class ThermalModel():
         # downstream of creasse
         idx_surface = rhs.size-nx
         idx = [x+1 for x in crev_idx if x < idx_surface]
-        rhs[idx] = rhs[idx] + (self.Lf/self.heat_capacity_intercept
-                               * flatten(self.bluelayer_right)) / self.dx
+        rhs[idx] = rhs[idx] + (self.Lf/self.heat_capacity_intercept *
+                               flatten(self.bluelayer_right))/self.ibg.dx
 
         for num, crev in enumerate(self.crev_idx):
             # upstream of crevasse
             if num+1 < len(self.crev_idx) or max(crev) > rhs.size-nx:
                 idx = [x-1 for x in crev if x < idx_surface]
-                rhs[idx] = rhs[idx] + (self.Lf / self.heat_capacity_intercept
-                                       * self.bluelayer_right) / self.dx
+                rhs[idx] = rhs[idx] + (self.Lf/self.heat_capacity_intercept *
+                                       self.bluelayer_right)/self.ibg.dx
 
         # adjust for air in crevasse above water level
         # need to pass water depth from crevasse to crevasse field,
@@ -458,16 +445,7 @@ class ThermalModel():
 
 
         """
-        # calculate refreezing for each crevasse
-
-        # calculate how much volume will refreeze in a year
-        # indicies diffusive lengthscale for 1 year = 5.6 meters
-
-        # only make calculation if there is enough info in T
-        # model must have advected more than 5.6 m
-        # (1 year thermal diffusivity) from crevasse location
-
-        ind = round(5.6/self.dx)
+        ind = round(5.6/self.ibg.dx)
 
         # initalize
         bluelayer_l = []
@@ -478,8 +456,10 @@ class ThermalModel():
         for num, crev in enumerate(self.crevasses):
 
             # get indicies for all z cooresponding to crevasse
-            ft_idx = np.arange(np.remainder(self.crev_idx[num][-1], self.x.size),
-                               self.crev_idx[num][-1] + self.x.size, self.x.size)
+            ft_idx = np.arange(np.remainder(self.crev_idx[num][-1],
+                                            self.ibg.x.size),
+                               self.crev_idx[num][-1]+self.ibg.x.size,
+                               self.ibg.x.size)
 
             # ice temp on downglacier side of crevasse (right)
             T_down = self.T.flatten()[[x + ind for x in ft_idx]]
@@ -487,7 +467,7 @@ class ThermalModel():
 
             virblue_r = self.calc_refreezing(self.T_crev, T_down)
             virblue_l = self.calc_refreezing(
-                T_up, self.T_crev) if self.x[0] <= crev[0]-5.6 else -virblue_r
+                T_up, self.T_crev) if self.ibg.x[0] <= crev[0]-5.6 else -virblue_r
 
             # save np.arrays to list
             bluelayer_l.append(virblue_l[-len(self.crev_idx[num]):])
@@ -504,11 +484,7 @@ class ThermalModel():
 
         return virtualblue_left, virtualblue_right
 
-    def calc_refreezing(self,
-                        T_crevasse,
-                        T_ice,
-                        # prevent_negatives=True
-                        ):
+    def calc_refreezing(self, T_crevasse, T_ice):
         """Refreezing layer thickness at crevasse wall in meters.
 
         The refreezing rate of meltwater Vfrz(z) can be approximated
@@ -547,7 +523,7 @@ class ThermalModel():
 
         """
         bluelayer = self.dt * (self.ki/self.Lf/self.ice_density) * (
-            T_crevasse - T_ice) / (round(5.6/self.dx)*self.dx)
+            T_crevasse - T_ice) / (round(5.6/self.ibg.dx)*self.ibg.dx)
 
         # set to zero if any values are negative
         # if prevent_negatives:

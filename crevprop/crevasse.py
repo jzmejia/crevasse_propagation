@@ -1,44 +1,13 @@
 """
 Copyright (c) 2021-2023 by Jessica Mejia <jzmejia@buffalo.edu>
-
-
-
-
-Crevasse 
 """
 import math as math
-
 import numpy as np
 from numpy import sqrt, abs
 from numpy.polynomial import Polynomial as P
 from scipy.constants import g, pi
 
 from .physical_constants import DENSITY_ICE, DENSITY_WATER, POISSONS_RATIO
-# from .crevasse_field import CrevasseField
-
-
-# STRESS INTENSITY FACTOR
-# For a fracture to propagate
-#        KI >= KIC
-# stress @ crev tip must >= fracture toughness of ice
-# where KI is the stress intensity factor
-# which describes the stresses at the fracture's tip
-# the material's fracture toughness (KIC)
-# Syntax from van der Veen
-# dw = depth to water ( or water depth) = distance from ice surface to
-#    the top of the water column within crevasee
-# d = crevasse depth = crevasse depth below ice surface
-# b = water height above crevasse tip
-# dw = d - b
-
-# 1. Find crack geometry and shape given water input(R, b, Nyrs) and
-#   background stress(sigmaT: + compression, - tensile) and physical
-#    constants(poissons ratio, shear modulus)
-
-# Takes into account
-# 1. Elastic opening(based on Krawczynski 2009)
-# 2. Viscous closure(based on Lilien Elmer results)
-# 3. Refreezing rate(diffusion and temperature gradient at sidewalls)
 
 
 class Crevasse:
@@ -85,7 +54,7 @@ class Crevasse:
                  z,
                  dz,
                  ice_thickness,
-                 x_coord,
+                 x,
                  Qin,
                  ice_softness,
                  sigmaCrev,
@@ -111,28 +80,26 @@ class Crevasse:
         self.z = z
         self.dz = dz
         self.ice_thickness = ice_thickness
-        self.x_coord = x_coord
+        self.x = x
 
         self.fracture_toughness = fracture_toughness
         self.mu = ice_softness
         self.ice_density = ice_density
-        
+
         # self.flotation_depth = (1-self.ice_density/1000) * self.ice_thickness
 
         # sigmaCrev = stress applied to/felt by crevasse
         self.sigmaCrev = sigmaCrev
 
-
         # dynamic, set initial crev conditions
         self.depth = 0.1
         self.volume = 1e-4
-        
-        
+
         # water-filled crevasse
         self.Qin = Qin
         # self.Vmelt = 0
         # self.Vpfa = 0
-        
+
         self.Vwater = 1e-4
         # depth = distance from ice surface to water surface in crevasse
         self.water_depth = 0
@@ -160,7 +127,6 @@ class Crevasse:
 
         self.FTHF = False  # full thickness hydrofracture achieved?
         self.alpha = self.calc_alpha(mode=1)
-        
 
         # tolerance for viscoelastic crevasse extension
         self.ztol = 1e-3  # m depth tolerance for
@@ -440,7 +406,7 @@ class Crevasse:
         ----------
         crevasse_depth : float
             crevasse depth in meters. 
-        
+
         Returns
         -------
         float
@@ -603,11 +569,6 @@ class Crevasse:
     #             self.depth ** 2 - self.water_depth ** 2)
     #             )
 
-    # def crev_morph(self):
-    #     """geometry solver
-    #     """
-    #     pass
-
     def crevasse_volume(self, z, water_depth, Dleft, Dright):
         """calculate volume of water filled crevasse
 
@@ -736,6 +697,8 @@ def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
     #     D1 - left crevasse profile against zgrid
     #     D2 - right crevasse profile against zgrid
     #     Fdiff1 - freezing component of change in volume/profile
+
+
 # Model Geometry
 #   + → x
 #   ↓
@@ -759,3 +722,25 @@ def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
 # where KI is the stress intensity factor
 # which describes the stresses at the fracture's tip
 # the material's fracture toughness (KIC)
+# STRESS INTENSITY FACTOR
+# For a fracture to propagate
+#        KI >= KIC
+# stress @ crev tip must >= fracture toughness of ice
+# where KI is the stress intensity factor
+# which describes the stresses at the fracture's tip
+# the material's fracture toughness (KIC)
+# Syntax from van der Veen
+# dw = depth to water ( or water depth) = distance from ice surface to
+#    the top of the water column within crevasee
+# d = crevasse depth = crevasse depth below ice surface
+# b = water height above crevasse tip
+# dw = d - b
+
+# 1. Find crack geometry and shape given water input(R, b, Nyrs) and
+#   background stress(sigmaT: + compression, - tensile) and physical
+#    constants(poissons ratio, shear modulus)
+
+# Takes into account
+# 1. Elastic opening(based on Krawczynski 2009)
+# 2. Viscous closure(based on Lilien Elmer results)
+# 3. Refreezing rate(diffusion and temperature gradient at sidewalls)

@@ -7,24 +7,9 @@ The main container for the crevasse propagation model, holding and
 initializing model geometry
 """
 import numpy as np
-# from numpy.lib.function_base import diff
 from numpy import abs
-# from numpy.polynomial import Polynomial as P
-# from scipy.constants import g, pi
-
-from dataclasses import dataclass
-
-
 import math as math
-from dataclasses import dataclass
-# import pandas as pd
-from typing import (
-    Dict,
-    List,
-    Any,
-    Optional,
-    Union
-)
+from dataclasses import dataclass, InitVar
 
 from .ice import Ice
 from .temperature_field import ThermalModel
@@ -40,17 +25,22 @@ class geometry():
     dt: float
     u_surf: float
     crev_spacing: int
+    num_years: InitVar
     xmove: float = None
+    xmax: float = None
+    max_crevs: int = None
     length: float = None
     dx: float = None
 
-    def __post_init__(self):
+    def __post_init__(self, num_years):
         """add and update calculated attributes 
         """
         self.length = self.crev_spacing + self.u_surf
+        self.max_crevs = round(self.u_surf/self.crev_spacing) * num_years
+        self.xmax = (self.length+self.u_surf) * num_years
         self.dt = self.dt * pc.SECONDS_IN_DAY
         self.u_surf = self.u_surf / pc.SECONDS_IN_YEAR
-        self.xmove = np.abs(self.u_surf) * self.dt
+        self.xmove = round(np.abs(self.u_surf)*self.dt, 4)
 
     @property
     def z(self) -> np.array:
@@ -164,6 +154,7 @@ class IceBlock(Ice):
         dz,
         dt=0.5,
         years_to_run=2,
+        years_of_crevasses=2,
         thermal_freq=2,
         crev_spacing=30,
         T_profile=None,
@@ -186,7 +177,13 @@ class IceBlock(Ice):
             vertical sampling resolution within ice block (m)
         dt : float, int
             Timestep in days to run crevasse model (days)
-            defaults to 0.5 days.
+            Defaults to 0.5 days.
+        years_to_run: int
+            Number of years to run model for. Defaults to 2 years.
+        years_of_crevasses: int
+            How many years of doman to track crevasses for, before
+            iceblock becomes detached to upstream boundary. 
+            Defaults to 2 years.
         crev_spacing : float, int
             Spacing between crevasses in crevasse field (m)
         thermal_freq : float, int
@@ -216,15 +213,16 @@ class IceBlock(Ice):
         """
 
         super().__init__(ice_density, fracture_toughness)
-        self.ibg = geometry(ice_thickness, dz, dt, u_surf, crev_spacing)
+        self.ibg = geometry(ice_thickness, dz, dt, u_surf,
+                            crev_spacing, years_of_crevasses)
+        calc_options = ModelOptions(
+            blunt, include_creep, never_closed, compressive)
 
         # time domain
-        # initialize model to time=0
         self.t = 0
-        self.time = 0
-        # self.doy = 1
+        self.n = 0  # counter for time loop
+        self.added = 0
         self.num_years = years_to_run
-
         self.thermal_freq = thermal_freq
         self.dt_T = self._thermal_timestep(dt, thermal_freq)
 
@@ -232,14 +230,8 @@ class IceBlock(Ice):
         self.dx = self.calc_dx(self.ibg.length)
         setattr(self.ibg, 'dx', self.dx)
 
-        # crevasse field
-        # can multiply by int (num years to form new crevs/track for)
-        self.max_crevs = round(
-            self.ibg.u_surf/self.ibg.crev_spacing) * years_to_run
-
-        # temporary way to store crevasse info
+        # HACK: temporary way to store crevasse info
         self.crev_locs = [(-self.ibg.length, -3)]
-        # temporary storage for refreezing to bass back and forth
 
         # temperature field
         self.temperature = ThermalModel(self.ibg, self.dt_T, self.crev_locs,
@@ -254,16 +246,13 @@ class IceBlock(Ice):
 
         self.crev_field = CrevasseField(self.ibg,
                                         self.fracture_toughness,
-                                        self.max_crevs,
                                         self.virtualblue,
-                                        ModelOptions(blunt, include_creep,
-                                                     never_closed, compressive)
+                                        calc_options
                                         )
-        self.xmove = round(abs(self.ibg.u_surf) * self.ibg.dt, 4)
 
         self.detached = False
 
-    def advect_domain(self, t):
+    def expand(self):
         """increase domain length to allow crevasses to move downstream
 
         For the model's timestep `dt` and user-defined ice velocity
@@ -279,22 +268,16 @@ class IceBlock(Ice):
         # set downstream BC based on the month/season using history
         # from the previous year's runs
 
-        # TODO! because xmove can be smaller than dx, calculate di
-        # from cumulative timestep counter n, and subtract added, the
-        # tracker of how much the domain has grown over model run
-        # added will need to be initalized before this
-        # n will need to be initialized outside or given to function
+        self.ibg.length = self.ibg.length + self.ibg.dx
+        self.temperature.ibg = self.ibg
+        self.crev_field.geometry = self.ibg
 
-        # di = round(n * self.x_advect / self.dx) - added
-
-        # add conditional for if di >= dx, if not, don't add anything
-        # recalculate length
-        # recalculate x
-
-        # setattr(ibg, 'x', value)
+        # expand temperature matrix to match new x
+        self.temperature.T = np.column_stack(
+            (self.temperature.T_upglacier, self.temperature.T))
 
         # reassign ice surface temperature if variable
-        # recalculate T/update thermal model
+        # recalculate T/update thermal model - see
         # track crevasse location (downglacier-most)
 
         # detach domain if necessary
@@ -308,12 +291,22 @@ class IceBlock(Ice):
         """run model for one timestep
 
 
-
-        1. Update IceBlock geometry
-        2. Find new 
-
-
         """
+        self.time += self.dt
+        self.n += 1
+
+        di = round(self.n*self.ibg.xmove/self.ibg.dx) - self.added
+        self.added += di
+
+        if di == 1:
+            self.expand()
+
+        # Run fracture mechanics scheme
+        # then update crevasse attribute
+
+        # Run temperature solver with updated geometry
+        if self.n % self.thermal_freq == 0:
+            self.recalculate_temperature()
 
         # 1. advect domain
         # update IceBlock geometry
@@ -326,13 +319,17 @@ class IceBlock(Ice):
 
         pass
 
-    def update_temperatures(self):
+    def resolve_temperatures(self):
+        """recalculate iceblock temperatures for model timestep"""
         # for timesteps at the thermal model frequency calculate
         # temperatures for iceblock
 
-        # 1. update thermal model geometry to match iceblock
-        # 2. reassign/update crevasse locations in thermal model
+        # NOTE: T matrix expansion already handled by `.expand()`
+        # 1. update thermal boundary conditions
+
         # 3. execute model `ThermalModel.calc_temperature()`
+        self.temperature.calc_temperature(self.crev_locs)
+
         # 4. recalculate refreezing
         #       this updates ThermalModel instance with new bluelayer
         #       values that will be used in the next temperature calc
@@ -370,7 +367,7 @@ class IceBlock(Ice):
             lhs = crev/self.thermal_freq
             rhs = virtualblue_r[num]/self.thermal_freq
 
-            if self.dx != self.temperature.dx:
+            if self.ibg.dz != self.temperature.dz:
                 lhs = np.interp(self.ibg.z, self.temperature.z, lhs)
                 rhs = np.interp(self.ibg.z, self.temperature.z, rhs)
 
