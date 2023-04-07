@@ -1,6 +1,4 @@
 import math as math
-
-from typing import Union
 import numpy as np
 
 from .crevasse import Crevasse
@@ -37,22 +35,11 @@ class CrevasseField():
 
     def __init__(self,
                  geometry,
-
-
-
-                 fracture_toughness,    # does not change
-                 max_crevs,  # doesnt change, used for crev creation,
-                 # depends on ice velocity and how long you want
-                 # to run model/area you want to check, user defined
+                 fracture_toughness,
                  virtualblue,
                  comp_options,
-                 # used to define stress field
                  sigmaT0=120e3,
-
                  PFA_depth=None,
-
-                 # model options, for how to do calculations
-
                  ):
         """
 
@@ -106,7 +93,6 @@ class CrevasseField():
         # model geometry and domian management
         self.geometry = geometry
         self.virtualblue0 = self.deconvolve_refreezing(virtualblue)
-        self.max_crevs = max_crevs
 
         # ice properties
         self.fracture_toughness = fracture_toughness
@@ -116,7 +102,9 @@ class CrevasseField():
         # identify crevasses in instances object by calling
         # Crevasse.instances e.g., self.crevasses=Crevasse.instances
         # at bottom for now make a method so that i don't need all this
+        self.xcoords = []
         self.crevasses = self.create_crevasse()
+
         # self.crev_locs = [(-self.geometry.length, -0.1)]
         # self.crev_count = len(self.crev_locs)  # self.crevasse_list()
 
@@ -136,19 +124,17 @@ class CrevasseField():
         left, right = vb_tuple
         return left[0], right[0]
 
-    def expand_domain(self):
-        pass
+    # def expand_domain(self):
+    #     pass
 
     def run_through_time(self, updated_geometry):
         # self.geometry = updated_geometry
-
         # self.add_new_crevasse()
         # self.find_sigma_crev()
         # self.update_idx()
         # self.expand_domin(new_time)
         # for crevasse in crevasse field
         #     crevasse.propagate_fracture(Qin,virtual_blue)
-
         # update crevasse field with propagated crevase info
         # return anything that is needed
         pass
@@ -180,6 +166,12 @@ class CrevasseField():
         x = x-vector of model/iceblock 
 
         """
+
+        self.stress_field = self.sigmaT0 * np.sin(
+            -np.pi/self.wps*np.arange(-self.geometry.xmax,
+                                      self.geometry.dx,
+                                      self.geometry.dx))
+
         pass
 
     def create_crevasse(self):
@@ -204,3 +196,5 @@ class CrevasseField():
                  sigmaCrev,
                  self.virtualblue0,
                  fracture_toughness=self.fracture_toughness)
+
+        self.xcoords.append(-self.geometry.length)
