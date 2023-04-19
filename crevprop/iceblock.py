@@ -263,7 +263,7 @@ class IceBlock(Ice):
         self.dt_T = self._thermal_timestep(dt, thermal_freq)
 
         # ice block geometry
-        self.dx = self.calc_dx(self.ibg.length)
+        self.dx = round(self.calc_dx(self.ibg.length), 4)
         setattr(self.ibg, 'dx', self.dx)
 
         # HACK: temporary way to store crevasse info
@@ -304,7 +304,7 @@ class IceBlock(Ice):
         # set downstream BC based on the month/season using history
         # from the previous year's runs
 
-        self.ibg.length = self.ibg.length + self.ibg.dx
+        self.ibg.length += self.ibg.dx
         self.temperature.ibg = self.ibg
         self.crev_field.geometry = self.ibg
 
