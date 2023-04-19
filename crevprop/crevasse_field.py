@@ -1,7 +1,34 @@
 import math as math
 import numpy as np
 
+from dataclasses import dataclass
+from typing import Any
+
+
 from .crevasse import Crevasse
+
+
+@dataclass
+class StressField:
+    """
+    sigmaT0 : int
+        maximum tensile stress (xx) used to define the
+        amplitude of the stress field that IceBlock gets
+        advected down. Units in Pa
+    wpa : int
+        width of positve strain area
+        half-wavelength of stress field
+        defines the length of the stress field
+        that experiences positive straining (m)
+    """
+    sigmaT0: int
+    wpa: int
+    blunt: bool = False
+    sigma_crev: Any = 0
+
+    def sigmaT(self, x):
+        """calculate tensile stress for location x from upstream boundary."""
+        return self.sigmaT0 * np.sin(-np.pi/self.wpa*x)
 
 
 class CrevasseField():
@@ -39,10 +66,10 @@ class CrevasseField():
                  virtualblue,
                  comp_options,
                  sigmaT0=120e3,
+                 wpa=1500,
                  PFA_depth=None,
                  ):
         """
-
         Parameters
         ----------
         x : np.array
@@ -67,6 +94,11 @@ class CrevasseField():
             maximum far field tensile stress, amplitude of the stress
             field that the ice mass gets advected through, 
             by default 120e3 Pa m^0.5
+        wpa : float, int, optional
+            width of positive strain area in meters that ice advects 
+            through. Defaults to 1,500 m. Positive strain area begins
+            at up-glacier edge of ice block at -length/x[0], increasing
+            towards downglacier end of IceBlock.
         PFA_depth : float, int, optional
             meters penetration required to access the perrenial firn 
             aquifer, by default None
@@ -92,31 +124,26 @@ class CrevasseField():
         """
         # model geometry and domian management
         self.geometry = geometry
+        self.comp_options = comp_options
+
+        # define stress field
+        self.stress_field = StressField(sigmaT0, wpa, self.comp_options.blunt)
+
         self.virtualblue0 = self.deconvolve_refreezing(virtualblue)
 
         # ice properties
         self.fracture_toughness = fracture_toughness
         self.ice_softness = 1e8  # how soft is the ice
 
-        #  run create_crevasse at this point then
-        # identify crevasses in instances object by calling
-        # Crevasse.instances e.g., self.crevasses=Crevasse.instances
-        # at bottom for now make a method so that i don't need all this
+        # crevasses
         self.xcoords = []
         self.crevasses = self.create_crevasse()
 
         # self.crev_locs = [(-self.geometry.length, -0.1)]
         # self.crev_count = len(self.crev_locs)  # self.crevasse_list()
 
-        # temporary things needed for stress field
-        self.sigmaT0 = sigmaT0
-        self.sigmaCrev = 0  # changes sigma on each crev
-        self.wps = 3e3  # positive strain area width (m) half-wavelength
-
+        self.Qin = 0
         self.PFA_depth = PFA_depth
-
-        # model options
-        self.comp_options = comp_options
 
         self.crev_instances = Crevasse.instances
 
@@ -126,6 +153,9 @@ class CrevasseField():
 
     # def expand_domain(self):
     #     pass
+    def advected_distance(self):
+        """Crevasse distance from upglacier IceBlock edge in meters"""
+        return [-(self.geometry.length-abs(x)) for x in self.xcoords]
 
     def run_through_time(self, updated_geometry):
         # self.geometry = updated_geometry
@@ -144,35 +174,6 @@ class CrevasseField():
         crev_count = self.crev_instances.length()
         print(f"number of crevasses in crevasse field: {crev_count}")
         return crev_count
-
-    def stress_field(self):
-        """define stress field based on model geometry
-
-        stress field = sin wave with an amplitude matching
-        Rxx and a wavelength matching crevasse field length
-
-        a separate function will determine position within stress
-        field as model progresses (i.e., you will need to know the 
-        stresses at each crevasse location based on where they fall
-        within the stress field defined here.) Potentially move to 
-        crevasse field (or calculated here and then input to crevasse 
-        field class)
-
-        sigma_T = sigma_T0 * sin(-pi/ (wps * x))
-        where 
-        sigma_T = defines the stress sigma_T for all x in model domain
-        sigma_T0 = maximum tensile stress within stress field (Rxx)
-        wps = width of positive strain area (half wave length)
-        x = x-vector of model/iceblock 
-
-        """
-
-        self.stress_field = self.sigmaT0 * np.sin(
-            -np.pi/self.wps*np.arange(-self.geometry.xmax,
-                                      self.geometry.dx,
-                                      self.geometry.dx))
-
-        pass
 
     def create_crevasse(self):
         """create and initialize a new crevasse"""
