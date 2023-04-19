@@ -185,16 +185,18 @@ class CrevasseField():
 
         # add storage terms to class and update attrs/data
         # newCrev = Crevasse(self.z, self.dz, self.ice_thickness,)
+
         Qin = 1e-4  # zero value
         sigmaCrev = 10e4
-        Crevasse(self.geometry.z,
-                 self.geometry.dz,
-                 self.geometry.ice_thickness,
-                 self.geometry.length,
-                 Qin,
-                 self.ice_softness,
-                 sigmaCrev,
-                 self.virtualblue0,
-                 fracture_toughness=self.fracture_toughness)
+        crev = Crevasse(self.geometry.z,
+                        self.geometry.dz,
+                        self.geometry.ice_thickness,
+                        self.geometry.length,
+                        Qin,
+                        self.ice_softness,
+                        sigmaCrev,
+                        self.virtualblue0,
+                        fracture_toughness=self.fracture_toughness)
 
         self.xcoords.append(-self.geometry.length)
+        return crev
