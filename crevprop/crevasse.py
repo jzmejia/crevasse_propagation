@@ -10,7 +10,7 @@ from scipy.constants import g, pi
 from .physical_constants import DENSITY_ICE, DENSITY_WATER, POISSONS_RATIO
 
 
-class Crevasse:
+class Crevasse():
     """Crevasse formed considering elastic, creep, and refreezing
 
 
@@ -59,24 +59,11 @@ class Crevasse:
                  ice_softness,
                  sigmaCrev,
                  virblue,
-                 name=None,
                  ice_density=917,
                  fracture_toughness=100e3,
                  include_creep=False,
                  never_closed=False
                  ):
-        """
-
-        Parameters
-        ----------
-        Qin : _type_
-            _description_
-        ice_softness : float
-            Shear modulus of ice in units of GPa
-            accepted values range from 0.07-3.9 GPa
-
-
-        """
         self.z = z
         self.dz = dz
         self.ice_thickness = ice_thickness
