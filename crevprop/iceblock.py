@@ -19,7 +19,44 @@ from .crevasse_field import CrevasseField
 
 @dataclass
 class geometry():
-    """Class for defining 2D model geometry"""
+    """Class for defining 2D model geometry
+
+    Parameters
+    ----------
+    ice_thickness : float
+        ice thickness, thickness/height of iceblock in meters.
+    dz : float
+        vertical (z) resolution of model domain
+    dt : float
+        timestep to run crevasse model in days. dt attr access is in
+        seconds. 
+    u_surf : float
+        Surface ice velocity in meters per year
+    crev_spacing : int
+        Crevasse spacing in meters.
+    num_years : InitVar
+        Number of years to run model
+    xmove : float
+        Distance advected (m) in each timestep dt. 
+    xmax : float
+        maximum length of model domian in meters
+    max_crevs : int 
+        maximum number of crevasses that will be created in model domain
+    length : float
+        length of ice block in meters. Defaults to crev_spacing + u_surf
+        to allow one year of domain to exist downstream of first crev.
+    dx : float
+        Horizontal resolution/spacing of iceblock. Defaults to None.
+    x : np.ndarray
+        Array containing points along iceblock x-axis (horizontal) that
+        range from -length at the up-glaciermost point (lhs) to 0 at the
+        downglacier-most point, with a spacing of dx between values. 
+        As the domain advects x grows by adding points to the up-glacier
+        part of the domain. 
+    z : np.ndarray
+        Array containing points along iceblock z-axis from 0 at the ice
+        surface to -ice_thickness at the ice-bed interface. (m)
+    """
     ice_thickness: float
     dz: float
     dt: float
@@ -33,8 +70,7 @@ class geometry():
     dx: float = None
 
     def __post_init__(self, num_years):
-        """add and update calculated attributes 
-        """
+        """add and update calculated attributes"""
         self.length = self.crev_spacing + self.u_surf
         self.max_crevs = round(self.u_surf/self.crev_spacing) * num_years
         self.xmax = (self.length+self.u_surf) * num_years
@@ -215,7 +251,7 @@ class IceBlock(Ice):
         super().__init__(ice_density, fracture_toughness)
         self.ibg = geometry(ice_thickness, dz, dt, u_surf,
                             crev_spacing, years_of_crevasses)
-        calc_options = ModelOptions(
+        comp_options = ModelOptions(
             blunt, include_creep, never_closed, compressive)
 
         # time domain
@@ -247,7 +283,7 @@ class IceBlock(Ice):
         self.crev_field = CrevasseField(self.ibg,
                                         self.fracture_toughness,
                                         self.virtualblue,
-                                        calc_options
+                                        comp_options
                                         )
 
         self.detached = False
