@@ -20,11 +20,14 @@ class StressField:
         half-wavelength of stress field
         defines the length of the stress field
         that experiences positive straining (m)
+    blunt : bool
+        Whether to blunt stresses within crevasse field. 
+        Defaults to False.
     """
     sigmaT0: int
     wpa: int
     blunt: bool = False
-    sigma_crev: Any = 0
+    # sigma_crev: Any = 0
 
     def sigmaT(self, x):
         """calculate tensile stress for location x from upstream boundary."""
@@ -40,24 +43,55 @@ class CrevasseField():
         model runs through time and crevasses are advected downglacier
 
 
-    Attributes
+    Parameters
     ----------
-    fracture_toughness: int
+    geometry : obj
+        geometry class object for model domain
+    fracture_toughness : int
         fracture toughness of ice in Pa m^0.5
-    crev_spacing: int
-        spacing of crevasses within crevasse field in meters. Value
-        defined in `IceBlock` and remains unchanged.
-    sigmaT0: float, int, optional
-        maximum far field tensile stress, amplitude of the stress
-        field that the ice mass gets advected through,
-        by default 120e3 Pa m ^ 0.5
-    PFA_depth: float, int, optional
+    crev_spacing : int
+        spacing of crevasses within crevasse field in meters.
+    sigmaT0 : float, int, optional
+        maximum far field tensile stress, amplitude of the stress field
+        iceblock is advected through, by default 120e3 Pa m^0.5
+    wpa : float, int, optional
+        width of positive strain area in meters that ice advects
+        through. Defaults to 1, 500 m. Positive strain area begins
+        at up-glacier edge of ice block at - length/x[0], increasing
+        towards downglacier end of IceBlock.
+    PFA_depth : float, int, optional
         meters penetration required to access the perrenial firn
         aquifer, by default None
-    crev_count: int
+    include_creep : bool, optional
+        consider creep closure in model, by default False
+        NOTE: creep not yet supported by model due to data input
+        requirements
+    blunt : bool, optional
+        whether to blunt the stresses on individual crevasses, used
+        with creep calculation and sets sigmaTcrev = 0 for
+        interior crevasses within crevasse field, by default False
+    never_closed : bool, optional
+        always allow melt into the crevasse regardless of
+        near-surface pintching. This only affects the Qin calc.
+        by default True.
+    water_compressive : bool, optional
+        whether to allow water into crevasse when the longitudinal
+        stress on the crevasse is negative(compressive stress regeime). 
+        If false, don't allow water into crevasse if in a
+        compressive regeime. This affects the Qin calculation.
+        by default False
+
+
+    Attributes
+    ----------
+    crev_count : int
         number of crevasses in crevasse field
-    crev_locs: list of tuples
+    xcoords : list of tuples
         x-coordinates of each crevasse in field with current depths
+    advected_distance: list of floats
+        crevasse locations in meters from upglacier boundary of iceblock
+    ice_softness : 
+
     """
 
     def __init__(self,
@@ -69,62 +103,11 @@ class CrevasseField():
                  wpa=1500,
                  PFA_depth=None,
                  ):
-        """
-        Parameters
-        ----------
-        x : np.array
-            x-coordinates of model geometry/domain. 
-        z : np.array
-            depth-vector corresponding to ice block thickness
-        dx : float
-            horizontal sampling resolution of ice block (m)
-        dz : int, float
-            vertical sampling resolution of ice block (m)
-        dt : float
-            timestep of model runs
-        ice_thickness : float, int
-            thickness of ice block in meters
-        length : float, int
-            length of ice block in meters
-        fracture_toughness : int
-            fracture toughness of ice in Pa m^0.5
-        crev_spacing : int
-            spacing of crevasses within crevasse field in meters.
-        sigmaT0 : float, int, optional
-            maximum far field tensile stress, amplitude of the stress
-            field that the ice mass gets advected through, 
-            by default 120e3 Pa m^0.5
-        wpa : float, int, optional
-            width of positive strain area in meters that ice advects 
-            through. Defaults to 1,500 m. Positive strain area begins
-            at up-glacier edge of ice block at -length/x[0], increasing
-            towards downglacier end of IceBlock.
-        PFA_depth : float, int, optional
-            meters penetration required to access the perrenial firn 
-            aquifer, by default None
-        include_creep : bool, optional
-            consider creep closure in model, by default False
-            NOTE: creep not yet supported by model due to data input 
-            requirements
-        blunt : bool, optional
-            whether to blunt the stresses on individual crevasses, used
-            with creep calculation and sets sigmaTcrev=0 for 
-            interior crevasses within crevasse field, by default False
-        never_closed : bool, optional
-            always allow melt into the crevasse regardless of 
-            near-surface pintching. This only affects the Qin calc.
-            by default True.
-        water_compressive : bool, optional
-            whether to allow water into crevasse when the longitudinal 
-            stress on the crevasse is negative (compressive stress 
-            regeime). If false, don't allow water into crevasse if in a
-            compressive regeime. This affects the Qin calculation. 
-            by default False
 
-        """
         # model geometry and domian management
         self.geometry = geometry
         self.comp_options = comp_options
+        self.t = 0
 
         # define stress field
         self.stress_field = StressField(sigmaT0, wpa, self.comp_options.blunt)
@@ -147,27 +130,29 @@ class CrevasseField():
 
         self.crev_instances = Crevasse.instances
 
-    def deconvolve_refreezing(self, vb_tuple):
-        left, right = vb_tuple
-        return left[0], right[0]
-
-    # def expand_domain(self):
-    #     pass
+    @property
     def advected_distance(self):
         """Crevasse distance from upglacier IceBlock edge in meters"""
         return [-(self.geometry.length-abs(x)) for x in self.xcoords]
 
-    def run_through_time(self, updated_geometry):
-        # self.geometry = updated_geometry
-        # self.add_new_crevasse()
-        # self.find_sigma_crev()
-        # self.update_idx()
-        # self.expand_domin(new_time)
-        # for crevasse in crevasse field
+    def deconvolve_refreezing(self, vb_tuple):
+        left, right = vb_tuple
+        return left[0], right[0]
+
+    def evolve_crevasses(self, t, updated_geometry):
+        # update model geometry and time
+        self.geometry = updated_geometry
+        self.t = t
+
+        for idx, crevasse in enumerate(self.crev_instances):
+            Qin = self.Qin  # fix this
+            sigmaCrev = self.stress_field.sigmaT(self.advected_distance[idx])
+
+            crevasse.evolve(Qin, sigmaCrev)
+
         #     crevasse.propagate_fracture(Qin,virtual_blue)
         # update crevasse field with propagated crevase info
         # return anything that is needed
-        pass
 
     def crevasse_list(self):
         # example
@@ -184,19 +169,16 @@ class CrevasseField():
 
         # initialize via running Crevasse class at init
 
-        # add storage terms to class and update attrs/data
-        # newCrev = Crevasse(self.z, self.dz, self.ice_thickness,)
-
-        Qin = 1e-4  # zero value
-        sigmaCrev = 10e4
+        Qin = 0  # zero value
         crev = Crevasse(self.geometry.z,
                         self.geometry.dz,
                         self.geometry.ice_thickness,
                         self.geometry.length,
                         Qin,
                         self.ice_softness,
-                        sigmaCrev,
+                        round(self.stress_field.sigmaT(0)),
                         self.virtualblue0,
+                        self.t,
                         fracture_toughness=self.fracture_toughness)
 
         self.xcoords.append(-self.geometry.length)

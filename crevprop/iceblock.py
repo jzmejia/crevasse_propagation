@@ -323,6 +323,12 @@ class IceBlock(Ice):
 
         pass
 
+    def add_dx(self) -> bool:
+        """Should domain expand by dx for this model run"""
+        di = round(self.n*self.ibg.xmove/self.ibg.dx) - self.added
+        self.added += di
+        return True if di == 1 else False
+
     def increment_time(self):
         """run model for one timestep
 
@@ -331,10 +337,7 @@ class IceBlock(Ice):
         self.time += self.dt
         self.n += 1
 
-        di = round(self.n*self.ibg.xmove/self.ibg.dx) - self.added
-        self.added += di
-
-        if di == 1:
+        if self.add_dx():
             self.expand()
 
         # Run fracture mechanics scheme
@@ -344,11 +347,8 @@ class IceBlock(Ice):
         if self.n % self.thermal_freq == 0:
             self.recalculate_temperature()
 
-        # 1. advect domain
-        # update IceBlock geometry
-
         # update crevasse field geometry
-        # self.crevasse_field.run_through_time(input what is needed)
+        self.crev_field.evolve_crevasses(self.t, self.ibg)
         # find Qin to use in this timestep
         # execute fracture mechanics scheme
         #
