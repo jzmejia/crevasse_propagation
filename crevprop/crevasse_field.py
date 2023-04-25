@@ -2,7 +2,7 @@ import math as math
 import numpy as np
 
 from dataclasses import dataclass
-from typing import Any
+# from typing import Any, Tuple
 
 
 from .crevasse import Crevasse
@@ -21,7 +21,7 @@ class StressField:
         defines the length of the stress field
         that experiences positive straining (m)
     blunt : bool
-        Whether to blunt stresses within crevasse field. 
+        Whether to blunt stresses within crevasse field.
         Defaults to False.
     """
     sigmaT0: int
@@ -38,8 +38,8 @@ class CrevasseField():
     """Container for all crevasses within model domain
 
     Primary roles:
-    1. Gets crevasse field and model domain geometry from `IceBlock` 
-    2. Initializes, drives, and tracks all crevasses within domain as 
+    1. Gets crevasse field and model domain geometry from `IceBlock`
+    2. Initializes, drives, and tracks all crevasses within domain as
         model runs through time and crevasses are advected downglacier
 
 
@@ -76,7 +76,7 @@ class CrevasseField():
         by default True.
     water_compressive : bool, optional
         whether to allow water into crevasse when the longitudinal
-        stress on the crevasse is negative(compressive stress regeime). 
+        stress on the crevasse is negative(compressive stress regeime).
         If false, don't allow water into crevasse if in a
         compressive regeime. This affects the Qin calculation.
         by default False
@@ -90,7 +90,7 @@ class CrevasseField():
         x-coordinates of each crevasse in field with current depths
     advected_distance: list of floats
         crevasse locations in meters from upglacier boundary of iceblock
-    ice_softness : 
+    ice_softness :
 
     """
 
@@ -112,6 +112,7 @@ class CrevasseField():
         # define stress field
         self.stress_field = StressField(sigmaT0, wpa, self.comp_options.blunt)
 
+        # potential refreezing rate to use for new crevasses
         self.virtualblue0 = self.deconvolve_refreezing(virtualblue)
 
         # ice properties
@@ -120,6 +121,7 @@ class CrevasseField():
 
         # crevasses
         self.xcoords = []
+
         self.crevasses = self.create_crevasse()
 
         # self.crev_locs = [(-self.geometry.length, -0.1)]
@@ -131,13 +133,23 @@ class CrevasseField():
         self.crev_instances = Crevasse.instances
 
     @property
-    def advected_distance(self):
+    def advected_distance(self) -> list[float]:
         """Crevasse distance from upglacier IceBlock edge in meters"""
         return [-(self.geometry.length-abs(x)) for x in self.xcoords]
 
-    def deconvolve_refreezing(self, vb_tuple):
+    @property
+    def crev_info(self):
+
+    def deconvolve_refreezing(self, vb_tuple: tuple[list, list]):
         left, right = vb_tuple
         return left[0], right[0]
+
+    def update_virtualblue(self, vb_tuple: tuple[list, list]):
+        """update virtualblue with recalculated values"""
+        lhs, rhs = vb_tuple
+        for idx, crev in enumerate(self.crev_instances):
+            crev.virtualblue_left = lhs[idx]
+            crev.virtualblue_right = rhs[idx]
 
     def evolve_crevasses(self, t, updated_geometry):
         # update model geometry and time
