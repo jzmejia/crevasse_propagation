@@ -257,7 +257,7 @@ class IceBlock(Ice):
         # time domain
         self.t = 0
         self.n = 0  # counter for time loop
-        self.added = 0
+        self._added = 0
         self.num_years = years_to_run
         self.thermal_freq = thermal_freq
         self.dt_T = self._thermal_timestep(dt, thermal_freq)
@@ -270,8 +270,12 @@ class IceBlock(Ice):
         self.crev_locs = [(-self.ibg.length, -3)]
 
         # temperature field
-        self.temperature = ThermalModel(self.ibg, self.dt_T, self.crev_locs,
-                                        T_profile, T_surface, T_bed,
+        self.temperature = ThermalModel(self.ibg,
+                                        self.dt_T,
+                                        self.crev_locs,
+                                        T_profile,
+                                        T_surface,
+                                        T_bed,
                                         thermal_conductivity=self.ki,
                                         ice_density=self.ice_density,
                                         latient_heat_of_freezing_ice=self.Lf,
@@ -287,6 +291,9 @@ class IceBlock(Ice):
                                         )
 
         self.detached = False
+
+    @property
+    def info()
 
     def expand(self):
         """increase domain length to allow crevasses to move downstream
@@ -325,8 +332,8 @@ class IceBlock(Ice):
 
     def add_dx(self) -> bool:
         """Should domain expand by dx for this model run"""
-        di = round(self.n*self.ibg.xmove/self.ibg.dx) - self.added
-        self.added += di
+        di = round(self.n*self.ibg.xmove/self.ibg.dx) - self._added
+        self._added += di
         return True if di == 1 else False
 
     def increment_time(self):
@@ -334,7 +341,7 @@ class IceBlock(Ice):
 
 
         """
-        self.time += self.dt
+        self.t += self.ibg.dt
         self.n += 1
 
         if self.add_dx():
@@ -345,10 +352,12 @@ class IceBlock(Ice):
 
         # Run temperature solver with updated geometry
         if self.n % self.thermal_freq == 0:
-            self.recalculate_temperature()
+            self.temperature.calc_temperature(self.crev_locs)
 
-        # update crevasse field geometry
+        # update refreezing
+
         self.crev_field.evolve_crevasses(self.t, self.ibg)
+
         # find Qin to use in this timestep
         # execute fracture mechanics scheme
         #
@@ -374,9 +383,6 @@ class IceBlock(Ice):
 
         # REFREEZING NEEDS TO BE PASSED TO CREVASSE FIELD
 
-        pass
-
-    def propagate_fractures(self):
         pass
 
     def _get_virtualblue(self):
