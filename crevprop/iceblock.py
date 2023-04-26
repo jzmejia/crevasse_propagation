@@ -267,12 +267,12 @@ class IceBlock(Ice):
         setattr(self.ibg, 'dx', self.dx)
 
         # HACK: temporary way to store crevasse info
-        self.crev_locs = [(-self.ibg.length, -3)]
+        # self.crev_locs =
 
         # temperature field
         self.temperature = ThermalModel(self.ibg,
                                         self.dt_T,
-                                        self.crev_locs,
+                                        [(-self.ibg.length, -3)],
                                         T_profile,
                                         T_surface,
                                         T_bed,
@@ -293,7 +293,8 @@ class IceBlock(Ice):
         self.detached = False
 
     @property
-    def info()
+    def crev_locs(self):
+        return self.crev_field.crev_info
 
     def expand(self):
         """increase domain length to allow crevasses to move downstream
@@ -364,26 +365,26 @@ class IceBlock(Ice):
 
         pass
 
-    def resolve_temperatures(self):
-        """recalculate iceblock temperatures for model timestep"""
-        # for timesteps at the thermal model frequency calculate
-        # temperatures for iceblock
+    # def resolve_temperatures(self):
+    #     """recalculate iceblock temperatures for model timestep"""
+    #     # for timesteps at the thermal model frequency calculate
+    #     # temperatures for iceblock
 
-        # NOTE: T matrix expansion already handled by `.expand()`
-        # 1. update thermal boundary conditions
+    #     # NOTE: T matrix expansion already handled by `.expand()`
+    #     # 1. update thermal boundary conditions
 
-        # 3. execute model `ThermalModel.calc_temperature()`
-        self.temperature.calc_temperature(self.crev_locs)
+    #     # 3. execute model `ThermalModel.calc_temperature()`
+    #     self.temperature.calc_temperature(self.crev_locs)
 
-        # 4. recalculate refreezing
-        #       this updates ThermalModel instance with new bluelayer
-        #       values that will be used in the next temperature calc
-        #       and returns the new virtualblue that needs to go to
-        #       crevasses for their calculation in next timesteps
+    #     # 4. recalculate refreezing
+    #     #       this updates ThermalModel instance with new bluelayer
+    #     #       values that will be used in the next temperature calc
+    #     #       and returns the new virtualblue that needs to go to
+    #     #       crevasses for their calculation in next timesteps
 
-        # REFREEZING NEEDS TO BE PASSED TO CREVASSE FIELD
+    #     # REFREEZING NEEDS TO BE PASSED TO CREVASSE FIELD
 
-        pass
+    #     pass
 
     def _get_virtualblue(self):
         """gets and adjust refreezing values from ThermalModel
