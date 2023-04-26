@@ -138,7 +138,27 @@ class CrevasseField():
         return [-(self.geometry.length-abs(x)) for x in self.xcoords]
 
     @property
-    def crev_info(self):
+    def crev_info(self) -> list[tuple[float, float, float]]:
+        """return a list of properties for all crevasses in field
+
+        Returns
+        -------
+        crev_info: list[tuple[float,float,float]]
+            tuple of crevasse properties
+            xcoord : xcoordinate of crevasse (location) (m)
+            depth : crevasse depth in meters 
+            NOTE: check val is negative
+            water_depth : water depth below ice surface in meters
+        """
+        crev_info = []
+        for crev in self.crev_instances:
+            crev_info.append((crev.xcoord, crev.depth, crev.water_depth))
+        return crev_info
+
+    @property
+    def crev_num(self) -> int:
+        "number of crevasses in crevasse field"
+        return len(self.crev_instances)
 
     def deconvolve_refreezing(self, vb_tuple: tuple[list, list]):
         left, right = vb_tuple
@@ -185,7 +205,7 @@ class CrevasseField():
         crev = Crevasse(self.geometry.z,
                         self.geometry.dz,
                         self.geometry.ice_thickness,
-                        self.geometry.length,
+                        -self.geometry.length,
                         Qin,
                         self.ice_softness,
                         round(self.stress_field.sigmaT(0)),

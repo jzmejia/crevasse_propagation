@@ -143,7 +143,7 @@ class Crevasse():
     mu : int
         ice softness
     depth : float
-        Crevasse depth in meters below ice surface
+        Crevasse depth in meters below ice surface (positive)
     volume : float
         Crevasse volume (m^2)
     Vwater : float
@@ -171,7 +171,7 @@ class Crevasse():
                  z: np.array,
                  dz: int,
                  ice_thickness: int,
-                 x: np.array,
+                 x: float,
                  Qin: Union[int, float],
                  ice_softness: int,
                  sigmaCrev: float,
@@ -185,9 +185,8 @@ class Crevasse():
         self.z = z
         self.dz = dz
         self.ice_thickness = ice_thickness
-        self.x = x
+        self.xcoord = x
         self.t0 = t0
-
         self.fracture_toughness = fracture_toughness
         self.mu = ice_softness
         self.ice_density = ice_density
@@ -221,9 +220,9 @@ class Crevasse():
         self.Vfrz_prev = 0
 
         # crevasse wall displacement D(z)
-        # self.walls = np.zeros(len(self.z))
-        # self.left_wall = -self.walls
-        # self.right_wall = self.walls
+        self.walls = np.zeros(len(self.z))
+        self.left_wall = -self.walls
+        self.right_wall = self.walls
 
         # optional
         self.include_creep = include_creep  # note: reqs data
@@ -248,9 +247,6 @@ class Crevasse():
         return (t-self.t0)/SECONDS_IN_DAY
 
     # def set_virtualblue(self, ib_virblue):
-    #     left, right = ib_virblue
-
-    #     pass
 
     def evolve(self, Qin, sigmaCrev):
         """evolve crevasse for new timestep and inputs
@@ -307,15 +303,11 @@ class Crevasse():
         Qin : float
             Liquid water input to crevasse for timestep dt. 
         """
-        # required initializations/adjustments
 
-        # interval used in interval splitting to test different crevasse
-        # depths. This comes out of the elastic equation as if they are
-        # the only forces acting on crevasse during fracture.
-        # Z_elastic > true crev depth
         Z_elastic = max(self.depth, 0.1)
         dz = 1
         dy = 0.01  # z spacing resolution to use if crevasse is shallow
+        # finer z-resolution for crevasse calculations
         y = np.around(np.arange(-Z_elastic, dy, dy), decimals=2)
 
         Vwater = Qin
@@ -332,14 +324,10 @@ class Crevasse():
 
         # conditionals: did the crevasse creep or freeze closed?
 
-        # Begin loop on matching Vwater = Vcrevase (solving for crevasse
-        # volume required to support the input water)
-        # change crevasse volume to something very small
-
         # loop depends on tolerance values
         while abs(Vwater-Vcrev)/Vwater > self.voltol & dz > self.ztol:
 
-            # 1. assign water depth so that KI=KIC
+            # 1. calc water depth for KI(cracktip) = KIC
             water_depth = self.calc_water_depth(Z_elastic)
 
             # elastic crack geometry
@@ -357,12 +345,23 @@ class Crevasse():
             Dright = np.maximum(Dright0 + EDiff, np.zeros_like(Dright0))
 
             # REFREEZING CONTRIBUTION TO CREVASSE WIDTH
+            # 1. convert virtual blue (freezing IF crevasses goes that
+            # deep) to actual blue (freezing that actually occurs)
+
+            crev_idx = np.where(np.logical_and(self.z>-Z_elastic, 
+                                               self.z<-water_depth))
+            
+            
+            blueband_left = self.virtualblue_left[crev_idx]
+            blueband_right = self.virtualblue_right[crev_idx]
 
             # Creep Closure - calculated from data for area
             # if self.creep_closing:
             #     CDiff = self.creep_closing()
             # else:
             #     CDiff = np.zeros_like(FDiff_left)
+
+            #
 
         pass
 
@@ -661,15 +660,6 @@ class Crevasse():
         p = P([1.12, -0.23, 10.55, -21.72, 30.39])
         return 1.12 if use_approx else p(crevasse_depth / self.ice_thickness)
 
-    # def sigma(self):
-    #     return (self.sigma_T - (2 * DENSITY_ICE * g * self.depth) / pi
-    #             - DENSITY_WATER * g * self.water_depth
-    #             + (2/pi)*DENSITY_WATER * g * self.water_depth * math.asin(
-    #             self.water_depth/self.depth)
-    #             + ((2*DENSITY_WATER*g) / pi) * math.sqrt(
-    #             self.depth ** 2 - self.water_depth ** 2)
-    #             )
-
     def crevasse_volume(self, z, water_depth, Dleft, Dright):
         """calculate volume of water filled crevasse
 
@@ -775,3 +765,11 @@ class Crevasse():
     #     D1 - left crevasse profile against zgrid
     #     D2 - right crevasse profile against zgrid
     #     Fdiff1 - freezing component of change in volume/profile
+    # def sigma(self):
+    #     return (self.sigma_T - (2 * DENSITY_ICE * g * self.depth) / pi
+    #             - DENSITY_WATER * g * self.water_depth
+    #             + (2/pi)*DENSITY_WATER * g * self.water_depth * math.asin(
+    #             self.water_depth/self.depth)
+    #             + ((2*DENSITY_WATER*g) / pi) * math.sqrt(
+    #             self.depth ** 2 - self.water_depth ** 2)
+    #             )
