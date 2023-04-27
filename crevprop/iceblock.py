@@ -287,7 +287,8 @@ class IceBlock(Ice):
         self.crev_field = CrevasseField(self.ibg,
                                         self.fracture_toughness,
                                         self.virtualblue,
-                                        comp_options
+                                        comp_options,
+                                        self.ice_density
                                         )
 
         self.detached = False
