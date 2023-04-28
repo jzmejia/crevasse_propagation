@@ -528,7 +528,7 @@ class Crevasse():
 
         return max(0, crevasse_depth - water_height)
 
-    def calc_water_height(self, crevasse_depth):
+    def calc_water_height(self, crevasse_depth, Rxx=None):
         """calc water high in crevasse using Hooke text book formulation
 
         Linear Elastic Fracture Mechanics
@@ -578,13 +578,13 @@ class Crevasse():
         return (
             (
                 self.fracture_toughness
-                - self.tensile_stress(crevasse_depth)
-                + 0.683*self.ice_density*g*sqrt(pi) * (crevasse_depth**1.5)
+                - self.tensile_stress(crevasse_depth, Rxx=Rxx)
+                + 0.683*self.ice_density*g*sqrt(pi)*(crevasse_depth**1.5)
             )
             / (0.683*DENSITY_WATER*g*sqrt(pi))
         ) ** (2/3)
 
-    def tensile_stress(self, crevasse_depth):
+    def tensile_stress(self, crevasse_depth, Rxx=None):
         """calculate tensile stress
 
         LEFM
@@ -615,12 +615,15 @@ class Crevasse():
         ----------
         crevasse_depth : float
             crevasse depth below ice surface in m
+        Rxx : int, optional
+            applied stress on crevasse. Defaults to Crevasse.sigmaCrev
 
         Returns
         -------
             stress intensity factor's tensile component
         """
-        return self.F(crevasse_depth)*self.sigmaCrev*sqrt(pi*crevasse_depth)
+        Rxx = Rxx if Rxx else self.sigmaCrev
+        return self.F(crevasse_depth)*Rxx*sqrt(pi*crevasse_depth)
 
     def F(self, crevasse_depth):
         """Finite ice thickness correction for stress intensity factor

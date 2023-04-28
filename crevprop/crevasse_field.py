@@ -99,6 +99,7 @@ class CrevasseField():
                  fracture_toughness,
                  virtualblue,
                  comp_options,
+                 ice_density,
                  sigmaT0=120e3,
                  wpa=1500,
                  PFA_depth=None,
@@ -108,6 +109,7 @@ class CrevasseField():
         self.geometry = geometry
         self.comp_options = comp_options
         self.t = 0
+        self.ice_density = ice_density
 
         # define stress field
         self.stress_field = StressField(sigmaT0, wpa, self.comp_options.blunt)
@@ -211,6 +213,7 @@ class CrevasseField():
                         round(self.stress_field.sigmaT(0)),
                         self.virtualblue0,
                         self.t,
+                        ice_density=self.ice_density,
                         fracture_toughness=self.fracture_toughness)
 
         self.xcoords.append(-self.geometry.length)
