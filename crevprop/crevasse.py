@@ -565,7 +565,7 @@ class Crevasse():
 
         Parameters
         ----------
-        crevasse_depth: float
+        crevasse_depth: float, int, np.array, list
             crevasse depth below ice surface (m)
 
         Returns
