@@ -19,6 +19,7 @@ which describes the stresses at the fracture's tip
 the material's fracture toughness (KIC)
 
 """
+from scipy.integrate import trapz
 from numpy.lib.function_base import diff
 from .physical_constants import DENSITY_ICE, DENSITY_WATER, FRACTURE_TOUGHNESS, POISSONS_RATIO
 import numpy as np
@@ -390,3 +391,74 @@ def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
 
     """
     return ice_density - (ice_density - snow_density) * np.exp(-C*depth)
+
+
+def paterson_empirical_relation(b, rho_i=917, rho_s=350, C=0.02):
+    """depth dependant near-surface density 
+
+    rho_i=917 kg/m^3
+    rho_s=350kg/m^3
+    C=0.0165-0.0314 m^-1
+
+    """
+    return rho_i - (rho_i - rho_s)*np.exp(-C*b)
+
+
+def G(b, d, H):
+    """G(b,d) for given H-ice thickness from van der veen 1997
+
+    b - depth below surface
+    d - crevasse depth
+
+    """
+    gamma = b/d
+    lam = d/H
+    G = (3.52*(1-gamma)/(1-lam)**(3/2)
+         - (4.35-5.28*gamma)/(1-lam)**0.5
+         + ((1.3-0.3*gamma**(3.2))/(1-gamma**2)**0.5 + 0.83 - 1.76*gamma)
+         * (1-(1-gamma)*lam))
+    return G
+
+
+def overburden_stress(b):
+    rho_i = 917
+    rho_s = 350
+    g = 9.81
+    C = 0.02
+    return -rho_i*g*b+((rho_i-rho_s)/C)*g*(1-np.exp(-C*b))
+
+
+def f2(b, d, H, rhoi=917, rhos=350, C=0.02):
+    """integral within the equation for KI(2) van der veen 1998"""
+    return (-b+(rhoi-rhos)/(rhoi*C)*(1-np.exp(-C*b)))*G(b, d, H)
+
+
+def f3(a, b, d, H):
+    return (b-a)*G(b, d, H)
+
+
+def evaluate_KI1(d, H, Rxx):
+    """
+
+    Rxx :
+        resistive stress - normal stress responsible for crevasse opening
+        defined as the full stress sigma_xx minus the weight-induced
+        lithostatic stress, L
+    """
+    p = P([1.12, -0.23, 10.55, -21.72, 30.39])
+    return p(d/H)*Rxx*np.sqrt(np.pi*d)
+
+
+def evaluate_KI2(d, H, rhoi=917, rhos=350, C=0.02):
+    """KI(2) in units of MPa"""
+    x = np.arange(0, d, 0.01)
+    f = f2(x, d, H, rhoi=rhoi, rhos=rhos, C=C)
+    i_trapz = trapz(f, x)
+    return (((2*rhoi*9.81)/np.sqrt(np.pi*d)) * i_trapz)/1e6
+
+
+def evaluate_KI3(a, d, H):
+    """Units of MPa"""
+    x = np.arange(a, d, 0.01)
+    f = f3(a, x, d, H)
+    return ((2*1000*9.81)/np.sqrt(np.pi*d)*trapz(f, x))/1e6
