@@ -458,7 +458,36 @@ def evaluate_KI2(d, H, rhoi=917, rhos=350, C=0.02):
 
 
 def evaluate_KI3(a, d, H):
-    """Units of MPa"""
+    """Units of MPa
+
+    a - water depth below surface
+    d - crevasse depth
+    H - ice thickness
+
+    """
     x = np.arange(a, d, 0.01)
     f = f3(a, x, d, H)
-    return ((2*1000*9.81)/np.sqrt(np.pi*d)*trapz(f, x))/1e6
+    return ((2*1000*9.81)/np.sqrt(np.pi*d)*trapz(f, x))/1e6 if d > a else 0
+
+
+def evaluate_KInet(d, H, Rxx, a, rhoi=917, rhos=350, C=0.02):
+    return evaluate_KI1(d, H, Rxx) + evaluate_KI2(d, H, rhoi=rhoi, rhos=rhos, C=C) + evaluate_KI3(a, d, H)
+
+
+def penetration_depth_equ(d, H, Rxx, KIC):
+    """
+    penetration of a single crevasse equation
+
+    d -depth
+    H-ice thickness
+    Rxx - Rxx in Pa
+    KIC = fracture toughness in MPa
+
+
+    """
+    return evaluate_KI1(d, H, Rxx)+evaluate_KI2(d, H)-KIC
+
+
+def penetration_depth_approx(H, Rxx, KIC):
+    d = np.arange(0, 100)
+    vals = np.asarray([penetration_depth_equ(x, H, Rxx, KIC) for x in d])
