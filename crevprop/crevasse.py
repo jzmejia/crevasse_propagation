@@ -304,7 +304,6 @@ class Crevasse():
         """
         find crevasse shape givin water input and background stress
 
-
         this function adds elastic opening, creep closure, and 
         refreezing to make a crevasse. For a given 
 
@@ -392,11 +391,8 @@ class Crevasse():
                              ):
         """elastic crevasse wall displacement from applied stress sigmaT
 
-
-
         Weertmen's elastic equiation giving shape of crevasse based on 
         material prperties of ice, crevasse depth, water depth etc. 
-
 
         Parameters
         ----------
@@ -504,8 +500,6 @@ class Crevasse():
         crevasse. This correction is applied to crevasses shallower than
         30 m. 
 
-
-
         Parameters
         ----------
         crevasse_depth : float
@@ -525,6 +519,8 @@ class Crevasse():
             b1 = self.calc_water_height(d1)
             b2 = self.calc_water_height(d2)
             water_height = b1 + (b2-b1)/(d2-d1)*(crevasse_depth-d1)
+
+            # enforce condition that water_height<=crevasse_depth
 
         return max(0, crevasse_depth - water_height)
 
