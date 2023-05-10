@@ -31,7 +31,7 @@ class StressField:
 
     def sigmaT(self, x):
         """calculate tensile stress for location x from upstream boundary."""
-        return self.sigmaT0 * np.sin(-np.pi/self.wpa*x)
+        return self.sigmaT0 * np.cos(-np.pi/self.wpa*x)
 
 
 class CrevasseField():
