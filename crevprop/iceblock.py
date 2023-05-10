@@ -81,12 +81,12 @@ class geometry():
     @property
     def z(self) -> np.array:
         """1D array defining the vertical (z-direction) axis (m)"""
-        return np.arange(-self.ice_thickness, self.dz, self.dz)
+        return np.arange(float(-self.ice_thickness), self.dz, self.dz)
 
     @property
     def x(self) -> np.array:
         """1D array defining the horizontal (x-direction) axis (m)"""
-        return np.arange(-self.length, self.dx, self.dx)
+        return np.arange(float(-self.length), self.dx, self.dx)
 
 
 @dataclass
@@ -186,8 +186,8 @@ class IceBlock(Ice):
 
     def __init__(
         self,
-        ice_thickness,
-        dz,
+        ice_thickness : float,
+        dz : float,
         dt=0.5,
         years_to_run=2,
         years_of_crevasses=2,
