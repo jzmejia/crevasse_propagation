@@ -120,7 +120,7 @@ class Crevasse():
         meltwater input to crevasse
     ice_softness: int
         ice softness (mu)
-    sigmaCrev: float
+    sigma_crev: float
         applied stress on crevasse
     virblue: Tuple
         potential refreezing along crevasse walls (left,right)
@@ -174,7 +174,7 @@ class Crevasse():
                  x: float,
                  Qin: Union[int, float],
                  ice_softness: int,
-                 sigmaCrev: float,
+                 sigma_crev: float,
                  virblue: Tuple,
                  t0: int,
                  ice_density=917,
@@ -192,7 +192,7 @@ class Crevasse():
         self.ice_density = ice_density
 
         # self.flotation_depth = (1-self.ice_density/1000) * self.ice_thickness
-        self.sigmaCrev = sigmaCrev
+        self.sigma_crev = sigma_crev
 
         # dynamic, set initial crev conditions
         self.depth = 0.1
@@ -249,7 +249,7 @@ class Crevasse():
 
     # def set_virtualblue(self, ib_virblue):
 
-    def evolve(self, Qin, sigmaCrev):
+    def evolve(self, Qin, sigma_crev):
         """evolve crevasse for new timestep and inputs
 
         this function allows the crevasse's shape to evolve in response
@@ -261,10 +261,10 @@ class Crevasse():
         Qin : float
             volume of water input to crevasse during a timestep of model
             units of m^2
-        sigmaCrev : float
+        sigma_crev : float
             applied stress on crevasse in Pa
         """
-        setattr(self, 'sigmaCrev', sigmaCrev)
+        setattr(self, 'sigma_crev', sigma_crev)
         # Vwater = Qin
 
         if Qin > 1e-4 & self.depth < (self.ice_thickness - 10):
@@ -413,7 +413,7 @@ class Crevasse():
         """
 
         # define D and alpha for a water-free crevasse
-        sigma_A = self.applied_stress(self.sigmaCrev, crevasse_depth,
+        sigma_A = self.applied_stress(self.sigma_crev, crevasse_depth,
                                       water_depth, has_water=has_water)
 
         # define constant to avoid repeated terms in D equation
@@ -555,7 +555,7 @@ class Crevasse():
         shown in equations 2 and 3. An `if statement` can be added,
         however, `numpy`'s `polynomial` function is quite fast.
 
-        calculation uses class attrs `Crevasse.sigmaCrev` the normal 
+        calculation uses class attrs `Crevasse.sigma_crev` the normal 
         stress responsible for crevasse opening (i.e., the resistive 
         stress R$_{xx}$)
 
@@ -612,13 +612,13 @@ class Crevasse():
         crevasse_depth : float
             crevasse depth below ice surface in m
         Rxx : int, optional
-            applied stress on crevasse. Defaults to Crevasse.sigmaCrev
+            applied stress on crevasse. Defaults to Crevasse.sigma_crev
 
         Returns
         -------
             stress intensity factor's tensile component
         """
-        Rxx = Rxx if Rxx else self.sigmaCrev
+        Rxx = Rxx if Rxx else self.sigma_crev
         return self.F(crevasse_depth)*Rxx*sqrt(pi*crevasse_depth)
 
     def F(self, crevasse_depth):
