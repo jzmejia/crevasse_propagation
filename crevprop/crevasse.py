@@ -118,8 +118,8 @@ class Crevasse():
         x-coordinates of model geometry/domain. 
     Qin: Union[int, float]
         meltwater input to crevasse
-    ice_softness: int
-        ice softness (mu)
+    mu: float
+        shear modulus of ice in GPa
     sigma_crev: float
         applied stress on crevasse
     virblue: Tuple
@@ -173,7 +173,7 @@ class Crevasse():
                  ice_thickness: int,
                  x: float,
                  Qin: Union[int, float],
-                 ice_softness: int,
+                 mu: int,
                  sigma_crev: float,
                  virblue: Tuple,
                  t0: int,
@@ -188,7 +188,7 @@ class Crevasse():
         self.xcoord = x
         self.t0 = t0
         self.fracture_toughness = fracture_toughness
-        self.mu = ice_softness
+        self.mu = mu
         self.ice_density = ice_density
 
         # self.flotation_depth = (1-self.ice_density/1000) * self.ice_thickness
@@ -344,6 +344,8 @@ class Crevasse():
             EDiff = E - E0
 
             # Apply elastic opening to crevasse walls
+            # NOTE: this just  makes D=E?, why not just assign? because
+            # of the condition we are specifying?
             Dleft = np.minimum(Dleft0 - EDiff, np.zeros_like(Dleft0))
             Dright = np.maximum(Dright0 + EDiff, np.zeros_like(Dright0))
 
@@ -417,7 +419,7 @@ class Crevasse():
                                       water_depth, has_water=has_water)
 
         # define constant to avoid repeated terms in D equation
-        c1 = (2*self.alpha)/(self.mu*pi)
+        c1 = (2*self.alpha)/(self.mu*np.pi)
 
         # take supset of depth array to avoide dividing by zero at
         # crevasse tip
@@ -479,7 +481,8 @@ class Crevasse():
         applied_stress: float
             stress applied to crevasse walls (Rxx)
         """
-        sigma_A = sigma_T - (2 * self.ice_density * g * crevasse_depth)/pi
+        # will this need to be updated to incorporate variable density?
+        sigma_A = sigma_T - (2*self.ice_density*g*crevasse_depth)/pi
         if has_water or water_depth:
             sigma_A = (sigma_A
                        - DENSITY_WATER*g*water_depth
