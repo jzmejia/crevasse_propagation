@@ -349,30 +349,29 @@ class Crevasse():
             Dleft = np.minimum(Dleft0 - EDiff, np.zeros_like(Dleft0))
             Dright = np.maximum(Dright0 + EDiff, np.zeros_like(Dright0))
 
-            # REFREEZING CONTRIBUTION TO CREVASSE WIDTH
-            # 1. convert virtual blue (freezing IF crevasses goes that
-            # deep) to actual blue (freezing that actually occurs)
-
-            crev_idx = np.where(np.logical_and(self.z > -Z_elastic,
-                                               self.z < -water_depth))
-
-            blueband_left = self.virtualblue_left[crev_idx]
-            blueband_right = self.virtualblue_right[crev_idx]
+            FDiff = self.refreezing(Z_elastic, water_depth, y, Dleft, Dright)
+            
 
             # Creep Closure - calculated from data for area
-            # if self.creep_closing:
-            #     CDiff = self.creep_closing()
-            # else:
-            #     CDiff = np.zeros_like(FDiff_left)
+            if self.creep_closing:
+                CDiff = self.creep_closing()
+            else:
+                CDiff = np.zeros_like(FDiff[0])
 
             #
 
         pass
+    
+
+    def elastic_differential_opening(self):
+        pass
+    
+    
 
     def creep_closing(self):
         pass
 
-    def refreezing(self, crevasse_depth, water_depth):
+    def refreezing(self, Z_elastic, water_depth, y, Dleft, Dright):
         """Refreezing contribution to crevasse width
 
         Parameters
@@ -380,7 +379,28 @@ class Crevasse():
         water_depth : float
         crevasse_depth : float
         """
-        pass
+
+        # REFREEZING CONTRIBUTION TO CREVASSE WIDTH
+        # 1. convert virtual blue (freezing IF crevasses goes that
+        # deep) to actual blue (freezing that actually occurs)
+        # displacement incurred by freezing will always decrease the
+        # size of the crevasse
+
+        crev_idx = np.where(np.logical_and(self.z > -Z_elastic,
+                                           self.z < -water_depth))
+
+        blueband_left = self.virtualblue_left[crev_idx]
+        blueband_right = self.virtualblue_right[crev_idx]
+
+        # Interpolate to y grid and add in refreezing allowing
+        # asymmeetric refreezing if necessary. Make FDiff no greater
+        # than the crevasse width before adding it
+        FDiff_left = np.interp(y, self.z[crev_idx], -blueband_left)
+        FDiff_right = np.interp(y, self.z[crev_idx], blueband_right)
+
+        FDiff_left = np.maximum(0, np.minimum(FDiff_left, -Dleft))
+        FDiff_right = np.maximum(0, np.minimum(FDiff_right, Dright))
+        return FDiff_left, FDiff_right
 
     # everything below are class methods added from fracture.py
     # NOTE: all describe linear elastic fracture mechanics
