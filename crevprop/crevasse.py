@@ -353,14 +353,48 @@ class Crevasse():
             
 
             # Creep Closure - calculated from data for area
-            if self.creep_closing:
+            if self.include_creep:
                 CDiff = self.creep_closing()
             else:
-                CDiff = np.zeros_like(FDiff[0])
+                CDiff = np.zeros_like(FDiff[0]) # why not just not include?
 
-            #
+            Dleft = np.minimum(Dleft0 - EDiff + FDiff[0] + CDiff, 0)
+            Dright = np.maximum(Dright0 + EDiff - FDiff[1] - CDiff, 0)
+            
+            
+            # if uneven refreezing (i.e., Dleft and Dright don't )
+            # Crevasse wall geometry without refreezing
+            # Dleft_wet = np.minimum(Dleft0 - EDiff + CDiff, 0)
+            # Dright_wet = np.maximum(Dright0 + EDiff - CDiff, 0)
+            
 
-        pass
+
+            # Average wall location
+            # D = mean(-Dleft,Dright)
+            
+            # find volume of water that this crevasse and dw can hold
+            # Vcrev = CrevasseVolume(Dleft,Dright)
+            
+            # How much meltwater is there in this crevasse once water 
+            # frozen onto the crevasse walls has been taken out?
+            # Vfrz = CrevasseVolume(FDiff1, FDiff2)
+            # Vfrz = min(Vwater,Vfrz)
+            
+            # if Vwater==0 must shoal crevasse because it sucked up water
+            # else grow the crevasse deeper
+            #   here, the currently estimated crevasse volume is less 
+            #   than the water volume and the crevasse will grow downwards
+            
+            # else the currently estimated crevasse volume > water volume 
+            #    and the crevasse will shrink uwardsp
+            
+            
+            # if the difference between Z calculated for the current and 
+            #   last run of the while loop is very small or the crevase 
+            #   reached bedrook then break the loop
+            
+        
+        return Dleft, Dright, Vcrev, Vwater, FDiff
     
 
     def elastic_differential_opening(self):
