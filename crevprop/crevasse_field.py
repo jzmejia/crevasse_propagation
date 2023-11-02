@@ -90,7 +90,7 @@ class CrevasseField():
         x-coordinates of each crevasse in field with current depths
     advected_distance: list of floats
         crevasse locations in meters from upglacier boundary of iceblock
-    ice_softness :
+    mu :
 
     """
 
@@ -119,7 +119,7 @@ class CrevasseField():
 
         # ice properties
         self.fracture_toughness = fracture_toughness
-        self.ice_softness = 1e8  # how soft is the ice
+        self.mu = 1e8  # 
 
         # crevasses
         self.xcoords = []
@@ -135,14 +135,14 @@ class CrevasseField():
         self.crev_instances = Crevasse.instances
 
     @property
-    def advected_distance(self) -> list[float]:
+    def advected_distance(self):
         """Crevasse distance from upglacier IceBlock edge in meters"""
         return [-(self.geometry.length-abs(x)) for x in self.xcoords]
 
     @property
-    def crev_info(self) -> list[tuple[float, float, float]]:
+    def crev_info(self):
         """return a list of properties for all crevasses in field
-
+        list[tuple[float, float, float]]
         Returns
         -------
         crev_info: list[tuple[float,float,float]]
@@ -162,12 +162,15 @@ class CrevasseField():
         "number of crevasses in crevasse field"
         return len(self.crev_instances)
 
-    def deconvolve_refreezing(self, vb_tuple: tuple[list, list]):
+    def deconvolve_refreezing(self, vb_tuple):
         left, right = vb_tuple
         return left[0], right[0]
 
-    def update_virtualblue(self, vb_tuple: tuple[list, list]):
-        """update virtualblue with recalculated values"""
+    def update_virtualblue(self, vb_tuple):
+        """update virtualblue with recalculated values
+        
+        : tuple[list, list]
+        """
         lhs, rhs = vb_tuple
         for idx, crev in enumerate(self.crev_instances):
             crev.virtualblue_left = lhs[idx]
@@ -209,7 +212,7 @@ class CrevasseField():
                         self.geometry.ice_thickness,
                         -self.geometry.length,
                         Qin,
-                        self.ice_softness,
+                        self.mu,
                         round(self.stress_field.sigmaT(0)),
                         self.virtualblue0,
                         self.t,
