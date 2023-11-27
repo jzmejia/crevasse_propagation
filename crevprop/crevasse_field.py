@@ -90,7 +90,7 @@ class CrevasseField():
         x-coordinates of each crevasse in field with current depths
     advected_distance: list of floats
         crevasse locations in meters from upglacier boundary of iceblock
-    ice_softness :
+    mu :
 
     """
 
@@ -119,7 +119,7 @@ class CrevasseField():
 
         # ice properties
         self.fracture_toughness = fracture_toughness
-        self.ice_softness = 1e8  # how soft is the ice
+        self.mu = 1e8  # 
 
         # crevasses
         self.xcoords = []
@@ -133,16 +133,25 @@ class CrevasseField():
         self.PFA_depth = PFA_depth
 
         self.crev_instances = Crevasse.instances
+        
+        
+        # initialize creep
+        # 1. accept in data
+        # 2. reduce data set with model params 
+        # (sigma range) and length of time to run model
+        
+        
+        
 
     @property
-    def advected_distance(self) -> list[float]:
+    def advected_distance(self):
         """Crevasse distance from upglacier IceBlock edge in meters"""
         return [-(self.geometry.length-abs(x)) for x in self.xcoords]
 
     @property
-    def crev_info(self) -> list[tuple[float, float, float]]:
+    def crev_info(self):
         """return a list of properties for all crevasses in field
-
+        list[tuple[float, float, float]]
         Returns
         -------
         crev_info: list[tuple[float,float,float]]
@@ -162,12 +171,15 @@ class CrevasseField():
         "number of crevasses in crevasse field"
         return len(self.crev_instances)
 
-    def deconvolve_refreezing(self, vb_tuple: tuple[list, list]):
+    def deconvolve_refreezing(self, vb_tuple):
         left, right = vb_tuple
         return left[0], right[0]
 
-    def update_virtualblue(self, vb_tuple: tuple[list, list]):
-        """update virtualblue with recalculated values"""
+    def update_virtualblue(self, vb_tuple):
+        """update virtualblue with recalculated values
+        
+        : tuple[list, list]
+        """
         lhs, rhs = vb_tuple
         for idx, crev in enumerate(self.crev_instances):
             crev.virtualblue_left = lhs[idx]
@@ -209,7 +221,7 @@ class CrevasseField():
                         self.geometry.ice_thickness,
                         -self.geometry.length,
                         Qin,
-                        self.ice_softness,
+                        self.mu,
                         round(self.stress_field.sigmaT(0)),
                         self.virtualblue0,
                         self.t,
@@ -218,3 +230,40 @@ class CrevasseField():
 
         self.xcoords.append(-self.geometry.length)
         return crev
+
+
+def inclusive_slice(a, a_min, a_max):
+    """Array subset with values on or outside of given range
+    
+    Given an interval, the array is clipped to the closest values
+    corresponding to the interval edges such that the resulting
+    array has the shortest length while encompassing the entire
+    value range given by a_min and a_max.
+    
+    No check is performed to ensure ``a_min < a_max``
+    
+    Parameters
+    ----------
+    a : array_like
+        Array containing elements to clip.
+    a_min, a_max : array_like or None
+        Minimum and maximum value. If ``None``, clipping is not performed on
+        the corresponding edge. Only one of `a_min` and `a_max` may be
+        ``None``. Both are broadcast against `a`.
+    
+    Returns
+    -------
+    clipped_array : ndarray
+        An array with elements of `a` corresponding to the 
+        inclusive range of `a_min` to `a_max`
+    
+    Examples
+    --------
+    >>> a = np.array([0,30,60,90,120,150,180])
+    >>> inclusive_slice(a,100,120)
+    array([90,120])
+    >>> inclusive_slice(a,40,61.7)
+    array([30,60,90])
+    
+    """
+    return a[np.argwhere(a<=a_min).item(-1):np.argwhere(a>=a_max).item(0)+1]

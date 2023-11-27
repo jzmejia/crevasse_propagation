@@ -317,7 +317,7 @@ class Crevasse():
         dz = 1
         dy = 0.01  # z spacing resolution to use if crevasse is shallow
         # finer z-resolution for crevasse calculations
-        y = np.arange(-Z_elastic, dy, dy)
+        
 
         Vwater = Qin
         Vcrev = 1e-15  # init crev volume to something very small
