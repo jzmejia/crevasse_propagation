@@ -133,6 +133,15 @@ class CrevasseField():
         self.PFA_depth = PFA_depth
 
         self.crev_instances = Crevasse.instances
+        
+        
+        # initialize creep
+        # 1. accept in data
+        # 2. reduce data set with model params 
+        # (sigma range) and length of time to run model
+        
+        
+        
 
     @property
     def advected_distance(self):
@@ -221,3 +230,40 @@ class CrevasseField():
 
         self.xcoords.append(-self.geometry.length)
         return crev
+
+
+def inclusive_slice(a, a_min, a_max):
+    """Array subset with values on or outside of given range
+    
+    Given an interval, the array is clipped to the closest values
+    corresponding to the interval edges such that the resulting
+    array has the shortest length while encompassing the entire
+    value range given by a_min and a_max.
+    
+    No check is performed to ensure ``a_min < a_max``
+    
+    Parameters
+    ----------
+    a : array_like
+        Array containing elements to clip.
+    a_min, a_max : array_like or None
+        Minimum and maximum value. If ``None``, clipping is not performed on
+        the corresponding edge. Only one of `a_min` and `a_max` may be
+        ``None``. Both are broadcast against `a`.
+    
+    Returns
+    -------
+    clipped_array : ndarray
+        An array with elements of `a` corresponding to the 
+        inclusive range of `a_min` to `a_max`
+    
+    Examples
+    --------
+    >>> a = np.array([0,30,60,90,120,150,180])
+    >>> inclusive_slice(a,100,120)
+    array([90,120])
+    >>> inclusive_slice(a,40,61.7)
+    array([30,60,90])
+    
+    """
+    return a[np.argwhere(a<=a_min).item(-1):np.argwhere(a>=a_max).item(0)+1]
