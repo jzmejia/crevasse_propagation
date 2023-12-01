@@ -111,6 +111,7 @@ class CrevasseField():
         self.geometry = geometry
         self.comp_options = comp_options
         self.t = 0
+        self.n = 0
         self.ice_density = ice_density
 
         # define stress field
@@ -196,6 +197,7 @@ class CrevasseField():
         # update model geometry and time
         self.geometry = updated_geometry
         self.t = t
+        self.n += 1
 
         # calculate stress and Qin for each crevasse and evolve
         for idx, crevasse in enumerate(self.crev_instances):
@@ -207,6 +209,7 @@ class CrevasseField():
         #     crevasse.propagate_fracture(Qin,virtual_blue)
         # update crevasse field with propagated crevase info
         # return anything that is needed
+        
 
     def crevasse_list(self):
         # example
@@ -236,7 +239,8 @@ class CrevasseField():
                         self.t,
                         ice_density=self.ice_density,
                         fracture_toughness=self.fracture_toughness,
-                        creep_table=self.creep
+                        creep_table=self.creep,
+                        include_creep=self.comp_options.include_creep
                         )
 
         self.xcoords.append(-self.geometry.length)
