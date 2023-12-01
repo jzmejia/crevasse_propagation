@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 
 from .crevasse import Crevasse
+from .physical_constants import SECONDS_IN_YEAR, SECONDS_IN_DAY
 
 
 @dataclass
@@ -30,7 +31,7 @@ class StressField:
     # sigma_crev: Any = 0
 
     def sigmaT(self, x):
-        """calculate tensile stress for location x from upstream boundary."""
+        """calculate tensile stress x meters from upstream boundary."""
         return self.sigmaT0 * np.cos(-np.pi/self.wpa*x)
 
 
@@ -103,12 +104,14 @@ class CrevasseField():
                  sigmaT0=120e3,
                  wpa=1500,
                  PFA_depth=None,
+                 creep_table=None
                  ):
 
         # model geometry and domian management
         self.geometry = geometry
         self.comp_options = comp_options
         self.t = 0
+        self.n = 0
         self.ice_density = ice_density
 
         # define stress field
@@ -123,16 +126,23 @@ class CrevasseField():
 
         # crevasses
         self.xcoords = []
+        
+        # initialize creep 
+        self.creep = self.creep_init(creep_table)
 
         self.crevasses = self.create_crevasse()
 
         # self.crev_locs = [(-self.geometry.length, -0.1)]
         # self.crev_count = len(self.crev_locs)  # self.crevasse_list()
 
-        self.Qin = 0
+        # Qin for timestep using annual value of 10000m^2/year 
+        # for 0.5 day timestep we are inputting 13.7m^2 at each timestep
+        # or 27.4m^2/day
+        self.Qin = round(10000/SECONDS_IN_YEAR*self.geometry.dt,1)
         self.PFA_depth = PFA_depth
 
         self.crev_instances = Crevasse.instances
+        
         
         
         # initialize creep
@@ -140,9 +150,6 @@ class CrevasseField():
         # 2. reduce data set with model params 
         # (sigma range) and length of time to run model
         
-        
-        
-
     @property
     def advected_distance(self):
         """Crevasse distance from upglacier IceBlock edge in meters"""
@@ -164,6 +171,7 @@ class CrevasseField():
         crev_info = []
         for crev in self.crev_instances:
             crev_info.append((crev.xcoord, crev.depth, crev.water_depth))
+        print("xcoord, depth, water_depth")
         return crev_info
 
     @property
@@ -189,16 +197,19 @@ class CrevasseField():
         # update model geometry and time
         self.geometry = updated_geometry
         self.t = t
+        self.n += 1
 
+        # calculate stress and Qin for each crevasse and evolve
         for idx, crevasse in enumerate(self.crev_instances):
             Qin = self.Qin  # fix this
             sigmaCrev = self.stress_field.sigmaT(self.advected_distance[idx])
 
-            crevasse.evolve(Qin, sigmaCrev)
+            crevasse.evolve(Qin, sigmaCrev, t)
 
         #     crevasse.propagate_fracture(Qin,virtual_blue)
         # update crevasse field with propagated crevase info
         # return anything that is needed
+        
 
     def crevasse_list(self):
         # example
@@ -220,19 +231,36 @@ class CrevasseField():
                         self.geometry.dz,
                         self.geometry.ice_thickness,
                         -self.geometry.length,
+                        self.geometry.dt,
                         Qin,
                         self.mu,
                         round(self.stress_field.sigmaT(0)),
                         self.virtualblue0,
                         self.t,
                         ice_density=self.ice_density,
-                        fracture_toughness=self.fracture_toughness)
+                        fracture_toughness=self.fracture_toughness,
+                        creep_table=self.creep,
+                        include_creep=self.comp_options.include_creep
+                        )
 
         self.xcoords.append(-self.geometry.length)
         return crev
+    
+    def creep_init(self, data):
+        df1 = data
+        min_sigma=self.stress_field.sigmaT(
+            self.geometry.u_surf*SECONDS_IN_YEAR
+            *self.geometry.num_years)/1e3
+        max_sigma=self.stress_field.sigmaT0/1e3
+        sigma = inclusive_slice(df1.columns.get_level_values(
+            "sigma").drop_duplicates().to_numpy(),min_sigma,max_sigma)
+        yrs = inclusive_slice(df1.columns.get_level_values(
+            "years").drop_duplicates().to_numpy(),0,self.geometry.num_years)
+        df = df1.loc(axis=1)[yrs,sigma,:]
+        return df
+        
 
-
-def inclusive_slice(a, a_min, a_max):
+def inclusive_slice(a, a_min, a_max, pad=None):
     """Array subset with values on or outside of given range
     
     Given an interval, the array is clipped to the closest values
@@ -247,9 +275,13 @@ def inclusive_slice(a, a_min, a_max):
     a : array_like
         Array containing elements to clip.
     a_min, a_max : array_like or None
-        Minimum and maximum value. If ``None``, clipping is not performed on
-        the corresponding edge. Only one of `a_min` and `a_max` may be
-        ``None``. Both are broadcast against `a`.
+        Minimum and maximum value. If ``None``, clipping is not 
+        performed on the corresponding edge. 
+        Only one of `a_min` and `a_max` may be ``None``. 
+        Both are broadcast against `a`.
+    pad : int or None, optional
+        Include additional a values on either side of range.
+        Defaults to None.
     
     Returns
     -------
@@ -266,4 +298,8 @@ def inclusive_slice(a, a_min, a_max):
     array([30,60,90])
     
     """
-    return a[np.argwhere(a<=a_min).item(-1):np.argwhere(a>=a_max).item(0)+1]
+    # account for optional padding of window
+    i_min = -1 if pad is None else -1-pad
+    i_max = 0 if pad is None else pad
+    return a[np.argwhere(a<=a_min).item(i_min):
+        np.argwhere(a>=a_max).item(i_max)+1]
