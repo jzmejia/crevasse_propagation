@@ -52,9 +52,13 @@ import numpy as np
 from numpy import sqrt, abs
 from numpy.polynomial import Polynomial as P
 from scipy.constants import g, pi
+from scipy.interpolate import interpn
 from typing import Union, Tuple, List
 
-from .physical_constants import DENSITY_ICE, DENSITY_WATER, POISSONS_RATIO, SECONDS_IN_DAY
+from .physical_constants import (
+    DENSITY_ICE, DENSITY_WATER, POISSONS_RATIO, 
+    SECONDS_IN_DAY, SECONDS_IN_YEAR
+    )
 
 # math helper functions to simplify the
 
@@ -116,13 +120,15 @@ class Crevasse():
         thickness of ice block in meters
     x: np.array
         x-coordinates of model geometry/domain. 
-    Qin: Union[int, float]
-        meltwater input to crevasse
+    dt: int
+        model run timestep in seconds.
+    Qin: float
+        meltwater input to crevasse in m^2 over timestep dt
     mu: float
         shear modulus of ice in GPa
     sigma_crev: float
-        applied stress on crevasse
-    virblue: Tuple
+        applied stress on crevasse in kPa
+    virblue: Tuple of np.array
         potential refreezing along crevasse walls (left,right)
     t0: int
         current model time in seconds when class initialized.
@@ -172,21 +178,25 @@ class Crevasse():
                  dz: int,
                  ice_thickness: int,
                  x: float,
+                 dt: int,
                  Qin: Union[int, float],
                  mu: int,
                  sigma_crev: float,
                  virblue: Tuple,
-                 t0: int,
+                 t0: int, # currently set to 0 in crevasse_field
                  ice_density=917,
                  fracture_toughness=100e3,
                  include_creep=False,
-                 never_closed=False
+                 never_closed=False,
+                 creep_table=None,
                  ):
         self.z = z
         self.dz = dz
         self.ice_thickness = ice_thickness
         self.xcoord = x
+        self.dt = dt
         self.t0 = t0
+        self.t = t0
         self.fracture_toughness = fracture_toughness
         self.mu = mu
         self.ice_density = ice_density
@@ -195,8 +205,8 @@ class Crevasse():
         self.sigma_crev = sigma_crev
 
         # dynamic, set initial crev conditions
-        self.depth = 0.1
-        self.volume = 1e-4
+        self.depth = 10
+        self.volume = 1e-15
 
         # water-filled crevasse
         self.Qin = Qin
@@ -205,7 +215,7 @@ class Crevasse():
 
         self.Vwater = 1e-4
         # depth = distance from ice surface to water surface in crevasse
-        self.water_depth = 0
+        self.water_depth = self.depth
         # height = height of water above crevasse tip
         self.water_height = 0
         # TODO: make depth or height a computed property
@@ -215,17 +225,24 @@ class Crevasse():
         # volume of water refrozen in crevasse, curent timestep
         self.Vfrz = 0
         self.virtualblue_left, self.virtualblue_right = virblue
-
+        self.bluelayer = []
+        
         # volume of water refrozen in crevasse, prev timestep
         self.Vfrz_prev = 0
 
-        # crevasse wall displacement D(z)
-        self.walls = np.zeros(len(self.z))
-        self.left_wall = -self.walls
+        # crevasse wall displacement D(z) init to 0
+        self.walls = np.zeros_like(self.z)
+        self.left_wall = self.walls
         self.right_wall = self.walls
 
         # optional
         self.include_creep = include_creep  # note: reqs data
+        self.creep = creep_table
+        if creep_table is not None:
+            self.creep_vars=tupled_grid_array(self.creep)
+            self.creep_dims=tuple([x.size for x in self.creep_vars])
+        
+        
         self.never_closed = never_closed
         self.closed = False
         self.approximate_F = False
@@ -242,14 +259,19 @@ class Crevasse():
 
     # def __iter__(self):
     #     return iter(self.instances)
-
-    def age(self, t):
+    @property
+    def age_days(self):
         """How many days since the crevasse formed?"""
-        return (t-self.t0)/SECONDS_IN_DAY
+        return (self.t-self.t0)/SECONDS_IN_DAY
+    
+    @property
+    def age_yrs(self):
+        """How many days since the crevasse formed?"""
+        return (self.t-self.t0)/SECONDS_IN_YEAR
 
     # def set_virtualblue(self, ib_virblue):
 
-    def evolve(self, Qin, sigma_crev):
+    def evolve(self, Qin, sigma_crev, t):
         """evolve crevasse for new timestep and inputs
 
         this function allows the crevasse's shape to evolve in response
@@ -265,18 +287,22 @@ class Crevasse():
             applied stress on crevasse in Pa
         """
         setattr(self, 'sigma_crev', sigma_crev)
+        setattr(self, 't', t)
         # Vwater = Qin
 
-        if Qin > 1e-4 & self.depth < (self.ice_thickness - 10):
-            self.crevmorph(Qin)
+        if Qin > 1e-4 and self.depth < (self.ice_thickness - 10):
+            FDiff = self.crevmorph(Qin)
+            self.bluelayer.append(FDiff)
+            
 
         elif self.depth >= (self.ice_thickness - 10):
             # do nothing fracture mechanics related but set water level
             # to floation to best approximate a moulin
             dw = self.flotation_depth(self.depth)
             setattr(self, 'FTHF', True)
+            self.water_depth = dw
 
-            # calculate Vfrz for this timestep
+            # calculate Vfrz for this timestep (for a moulin)
         else:
             # there is no water to fill the crevasse
             dw = 0
@@ -288,8 +314,10 @@ class Crevasse():
 
         # TODO: after all these calculations you'll need to reset class
         # attrs to updated values
+        
+        
 
-        pass
+        
 
     def flotation_depth(self, crevasse_depth):
         """water depth required for flotation"""
@@ -298,7 +326,7 @@ class Crevasse():
     def _growth(self, z, Dleft, Dright, Vwater) -> bool:
         """will the crevasse grow given current water depth and Qin?"""
         return True if self.crevasse_volume(z, self.water_depth, Dleft, Dright
-                                            ) > Vwater else False
+                                            ) < Vwater else False
 
     def crevmorph(self, Qin):
         """
@@ -312,28 +340,48 @@ class Crevasse():
         Qin : float
             Liquid water input to crevasse for timestep dt. 
         """
-
-        Z_elastic = max(self.depth, 0.1)
+        counter = 0
+        Z_elastic = max(self.depth, 5)
         dz = 1
         dy = 0.01  # z spacing resolution to use if crevasse is shallow
-        # finer z-resolution for crevasse calculations
+        y0 = np.arange(-Z_elastic,0,dy)
+        Vwaterwas0 = False
         
 
         Vwater = Qin
         Vcrev = 1e-15  # init crev volume to something very small
 
         # current crevasse wall locations, redefining here to new y
-        Dleft0 = np.interp(y, self.z, self.left_wall)
-        Dright0 = np.interp(y, self.z, self.right_wall)
 
-        growth = self._growth(y, Dleft0, Dright0, Vwater)
+        Dleft0 = np.interp(y0, self.z, self.left_wall)
+        Dright0 = np.interp(y0, self.z, self.right_wall)
+        
+        growth = self._growth(y0, Dleft0, Dright0, Vwater)
+        wasgrowth = growth
 
-        while abs(Vwater-Vcrev)/Vwater > self.voltol & dz > self.ztol:
+        while abs(Vwater-Vcrev)/Vwater > self.voltol and dz > self.ztol:
 
+            # add counter here
+            counter+=1
+            # reset Vwater (it has had Vfrz added onto it)
+            Vwater = Qin
+            
+            # vertical coordinate
+            y = np.arange(-Z_elastic,0,dy)
+            
+            # recalc for new y
+            Dleft0 = np.interp(y, self.z, self.left_wall)
+            Dright0 = np.interp(y, self.z, self.right_wall)
+            
+            
             # 1. calc water depth for KI(cracktip) = KIC
             water_depth = self.calc_water_depth(Z_elastic)
+            df = (1-DENSITY_ICE/DENSITY_WATER) * Z_elastic
+            
+
 
             # elastic crack geometry
+            # ----------------------
             # right now filling with nans outside of crev size, do i
             # want to do this if i have to subtract or set to zero then
             # nan later for plotting?
@@ -341,7 +389,7 @@ class Crevasse():
             E = self.elastic_displacement(y, water_depth, Z_elastic)
 
             # Elastic differential opening
-            EDiff = E - E0
+            EDiff = E - E0 if self.t/self.dt > 1 else E
 
             # Apply elastic opening to crevasse walls
             # NOTE: this just  makes D=E?, why not just assign? because
@@ -349,20 +397,26 @@ class Crevasse():
             Dleft = np.minimum(Dleft0 - EDiff, np.zeros_like(Dleft0))
             Dright = np.maximum(Dright0 + EDiff, np.zeros_like(Dright0))
 
+
+            # Refreezing
+            # ----------
             FDiff = self.refreezing(Z_elastic, water_depth, y, Dleft, Dright)
             
 
-            # Creep Closure - calculated from data for area
-            if self.include_creep:
-                CDiff = self.creep_closing()
+            # Creep Closure
+            # -------------
+            if self.include_creep and self.creep_table is not None:
+                CDiff = self.creep_closing(Z_elastic,y,self.age_yrs)
             else:
                 CDiff = np.zeros_like(FDiff[0]) # why not just not include?
 
+            # Apply closure to crevasse profile
             Dleft = np.minimum(Dleft0 - EDiff + FDiff[0] + CDiff, 0)
             Dright = np.maximum(Dright0 + EDiff - FDiff[1] - CDiff, 0)
             
             
             # if uneven refreezing (i.e., Dleft and Dright don't )
+            
             # Crevasse wall geometry without refreezing
             # Dleft_wet = np.minimum(Dleft0 - EDiff + CDiff, 0)
             # Dright_wet = np.maximum(Dright0 + EDiff - CDiff, 0)
@@ -373,28 +427,102 @@ class Crevasse():
             # D = mean(-Dleft,Dright)
             
             # find volume of water that this crevasse and dw can hold
-            # Vcrev = CrevasseVolume(Dleft,Dright)
+            Vcrev = self.crevasse_volume(y,water_depth,Dleft,Dright)
             
             # How much meltwater is there in this crevasse once water 
             # frozen onto the crevasse walls has been taken out?
-            # Vfrz = CrevasseVolume(FDiff1, FDiff2)
-            # Vfrz = min(Vwater,Vfrz)
+            Vfrz = self.crevasse_volume(y,water_depth,FDiff[0],FDiff[1])
+            Vfrz = min(Vwater,Vfrz)
+            Z_elastic0 = Z_elastic
             
-            # if Vwater==0 must shoal crevasse because it sucked up water
-            # else grow the crevasse deeper
-            #   here, the currently estimated crevasse volume is less 
-            #   than the water volume and the crevasse will grow downwards
+            # grow or shoal crevasse
+            # TODO! ix this later, implementing it just as in matlab but 
+            # should be cleaned up
             
-            # else the currently estimated crevasse volume > water volume 
-            #    and the crevasse will shrink uwardsp
+            # if Vwater==0 must shoal crevasse because it sucked up
+            # water else grow the crevasse deeper
+            # here, the currently estimated crevasse volume is less 
+            # than the water volume and the crevasse will grow downwards
+            
+            # else the currently estimated crevasse volume > water vol 
+            # and the crevasse will shrink uwardsp
             
             
             # if the difference between Z calculated for the current and 
             #   last run of the while loop is very small or the crevase 
             #   reached bedrook then break the loop
-            
         
-        return Dleft, Dright, Vcrev, Vwater, FDiff
+        
+            if Vwater == 0:
+                dz = dz/2 if Vwaterwas0 else dz
+                Vwaterwas0 = True 
+                Z_elastic = max(Z_elastic-dz,0.1)
+            else:
+                if growth:
+                    if Vwater > Vcrev:
+                        dz = dz/2 if Vwaterwas0 else dz
+                        Z_elastic = Z_elastic+dz
+                    else:
+                        dz = dz/2 if wasgrowth else dz
+                        Z_elastic = max(Z_elastic-dz,0.1)
+                else:
+                    Z_elastic=Z_elastic+(dz/2) if Vwater > Vcrev else max(
+                        Z_elastic-dz,0.1)
+            
+            wasgrowth = Vwater > Vcrev
+                    
+            
+            if abs(Z_elastic-Z_elastic0) < 4e-16:
+                break
+            if Z_elastic >= self.ice_thickness:
+                self.FTHF = True
+                break
+        
+        # Now that Z has been solved for, put everything back 
+        # into usable forms
+        # self.depth = 
+        
+        
+        # 1. interpolate D back to zgrid of crevasse model
+        # name = interp (self.dz,...)
+        
+        # 2. save D by updating class properties
+        # recalculate crevasse volume and attrs
+            # how much volume was lost to creep?
+            # what is the new volume of water in the crevasse
+            # after accounting for refreezing?
+        # if not the case of FTHF
+        
+        if self.FTHF:
+            crev_depth = Z_elastic
+        else:
+        
+            # find the first point where refreezing is taking place
+            deps = self.ztol**2
+            crev_depth = -y[np.argwhere(FDiff[0]>deps)[0][0]]
+            if crev_depth < -y[0]:
+                crev_depth = -y[np.argwhere(FDiff[0]>deps)[0][0]-1]
+
+            # come backc and fix with some threshold or whatever if breaking here
+            Z_elastic = Z_elastic0
+                
+        self.depth=crev_depth
+        self.Vcrev=Vcrev
+        self.water_depth = water_depth
+        
+        # interpolate D back to grid
+        self.left_wall = np.interp(self.z,y,Dleft)
+        self.right_wall = np.interp(self.z,y,Dleft)
+        
+        
+        FDiff_left = np.interp(self.z,y,FDiff[0])
+        FDiff_right = np.interp(self.z,y,FDiff[1])
+        self.Vfrz = Vfrz
+        
+        
+        
+        
+        return FDiff_left, FDiff_right
     
 
     def elastic_differential_opening(self):
@@ -402,8 +530,54 @@ class Crevasse():
     
     
 
-    def creep_closing(self):
-        pass
+    def creep_closing(self, crev_depth, y, water_residence_time):
+        """_summary_
+
+        Parameters
+        ----------
+        y : np.array
+            crevasse depth vector for which to calculate creep upon
+            organized as -crevasse depth to 0 (ice surface)
+        crev_depth : _type_
+            _description_
+        water_residence_time : _type_
+            _description_
+            
+        Returns
+        -------
+        CDiff
+        
+        
+        """
+        # added below to class attrs
+        # creep_vars=tupled_grid_array(self.creep)
+        # creep_dims=tuple([x.size for x in creep_vars])
+        t = water_residence_time # interpolate on this if needed
+        
+        # interpolate:
+        print('executing creep closure')
+        
+        creep = []
+        for i in y:
+            creep.append(
+                interpn(creep_vars,
+                        self.creep.values.reshape(creep_dims),
+                        np.array([i,t,self.sigma_crev,crev_depth]),
+                        method='linear',fill_value=0
+                        )
+                )
+        print(creep)
+        
+        # if changing interp resolution, return to original res here.
+        
+        # convert from meters per year to meters per timestep dt
+        CDiff = creep * (self.dt/SECONDS_IN_YEAR)
+        
+        # convert to half-width
+        CDiff = CDiff/2
+        
+        
+        return CDiff
 
     def refreezing(self, Z_elastic, water_depth, y, Dleft, Dright):
         """Refreezing contribution to crevasse width
@@ -419,9 +593,13 @@ class Crevasse():
         # deep) to actual blue (freezing that actually occurs)
         # displacement incurred by freezing will always decrease the
         # size of the crevasse
-
+        
+        # interpolate virtual blue to y resolution
+        # vblue_left = np.interp(y,self.z,self.virtualblue_left)
+        # vblue_right = np.interp(y,self.z,self.virtualblue_right)
+        # indexing [0] because returns (np.array([...]),)
         crev_idx = np.where(np.logical_and(self.z > -Z_elastic,
-                                           self.z < -water_depth))
+                                           self.z < -water_depth))[0]
 
         blueband_left = self.virtualblue_left[crev_idx]
         blueband_right = self.virtualblue_right[crev_idx]
@@ -429,11 +607,16 @@ class Crevasse():
         # Interpolate to y grid and add in refreezing allowing
         # asymmeetric refreezing if necessary. Make FDiff no greater
         # than the crevasse width before adding it
-        FDiff_left = np.interp(y, self.z[crev_idx], -blueband_left)
-        FDiff_right = np.interp(y, self.z[crev_idx], blueband_right)
+        
+        if crev_idx.size > 0:
+            FDiff_left = np.interp(y, self.z[crev_idx], -blueband_left)
+            FDiff_right = np.interp(y, self.z[crev_idx], blueband_right)
 
-        FDiff_left = np.maximum(0, np.minimum(FDiff_left, -Dleft))
-        FDiff_right = np.maximum(0, np.minimum(FDiff_right, Dright))
+            FDiff_left = np.maximum(0, np.minimum(FDiff_left, -Dleft))
+            FDiff_right = np.maximum(0, np.minimum(FDiff_right, Dright))
+        else:
+            FDiff_left = np.zeros_like(Dleft)
+            FDiff_right = np.zeros_like(Dright)
         return FDiff_left, FDiff_right
 
     # everything below are class methods added from fracture.py
@@ -576,10 +759,16 @@ class Crevasse():
             b1 = self.calc_water_height(d1)
             b2 = self.calc_water_height(d2)
             water_height = b1 + (b2-b1)/(d2-d1)*(crevasse_depth-d1)
+            water_height = 5 if water_height <0 else water_height
 
             # enforce condition that water_height<=crevasse_depth
+            # original encorcement via 
+            # max(0, crevasse_depth - water_height)
+            # not working because water_height is having negative values
+            
 
-        return max(0, crevasse_depth - water_height)
+
+        return max(0, crevasse_depth-water_height)
 
     def calc_water_height(self, crevasse_depth, Rxx=None):
         """calc water high in crevasse using Hooke text book formulation
@@ -678,7 +867,7 @@ class Crevasse():
         Rxx = Rxx if Rxx else self.sigma_crev
         return self.F(crevasse_depth)*Rxx*sqrt(pi*crevasse_depth)
 
-    def F(self, crevasse_depth):
+    def F(self, crev_depth):
         """Finite ice thickness correction for stress intensity factor
 
         LEFM
@@ -698,7 +887,7 @@ class Crevasse():
 
         Parameters
         ----------
-        crevasse_depth: float, int
+        crev_depth: float, int
             depth below surface in meters
         use_approximation: bool
             whether to use shallow crevasse approximation.
@@ -711,7 +900,7 @@ class Crevasse():
             stress intensity correction factor
         """
         p = P([1.12, -0.23, 10.55, -21.72, 30.39])
-        return 1.12 if self.approximate_F else p(crevasse_depth/self.ice_thickness)
+        return 1.12 if self.approximate_F else p(crev_depth/self.ice_thickness)
 
     def crevasse_volume(self, z, water_depth, Dleft, Dright):
         """calculate volume of water filled crevasse
@@ -783,6 +972,14 @@ class Crevasse():
                   'dislocation alpha=1-v')
             alpha = 1 - POISSONS_RATIO
         return alpha
+    
+def tupled_grid_array(df):
+    a = []
+    for name in df.index.names:
+        a.append(df.index.get_level_values(name).drop_duplicates().to_numpy())
+    for name in df.columns.names:
+        a.append(df.columns.get_level_values(name).drop_duplicates().to_numpy())
+    return tuple(a)
 
     # Igore everything below - -- temporary notes from matlab script
 

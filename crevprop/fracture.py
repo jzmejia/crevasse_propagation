@@ -21,7 +21,8 @@ the material's fracture toughness (KIC)
 """
 from scipy.integrate import trapz
 from numpy.lib.function_base import diff
-from .physical_constants import DENSITY_ICE, DENSITY_WATER, FRACTURE_TOUGHNESS, POISSONS_RATIO
+from .physical_constants import (
+    DENSITY_ICE, DENSITY_WATER, FRACTURE_TOUGHNESS, POISSONS_RATIO)
 import numpy as np
 from numpy import sqrt, abs
 from numpy.polynomial import Polynomial as P
@@ -441,9 +442,9 @@ def evaluate_KI1(d, H, Rxx):
     """
 
     Rxx :
-        resistive stress - normal stress responsible for crevasse opening
-        defined as the full stress sigma_xx minus the weight-induced
-        lithostatic stress, L
+        resistive stress - normal stress responsible for crevasse 
+        opening defined as the full stress sigma_xx minus the 
+        weight-inducedlithostatic stress, L
     """
     p = P([1.12, -0.23, 10.55, -21.72, 30.39])
     return p(d/H)*Rxx*np.sqrt(np.pi*d)
@@ -471,7 +472,8 @@ def evaluate_KI3(a, d, H):
 
 
 def evaluate_KInet(d, H, Rxx, a, rhoi=917, rhos=350, C=0.02):
-    return evaluate_KI1(d, H, Rxx) + evaluate_KI2(d, H, rhoi=rhoi, rhos=rhos, C=C) + evaluate_KI3(a, d, H)
+    return evaluate_KI1(d,H,Rxx) + evaluate_KI2(d,H,rhoi=rhoi,rhos=rhos,C=C
+                                                ) + evaluate_KI3(a,d,H)
 
 
 def penetration_depth_equ(d, H, Rxx, KIC):

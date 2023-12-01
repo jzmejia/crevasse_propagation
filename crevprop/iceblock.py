@@ -71,6 +71,7 @@ class geometry():
 
     def __post_init__(self, num_years):
         """add and update calculated attributes"""
+        self.num_years = num_years
         self.length = self.crev_spacing + self.u_surf
         self.max_crevs = round(self.u_surf/self.crev_spacing) * num_years
         self.xmax = (self.length+self.u_surf) * num_years
@@ -202,7 +203,8 @@ class IceBlock(Ice):
         blunt=False,
         include_creep=False,
         never_closed=True,
-        compressive=False
+        compressive=False,
+        creep_table=None
     ):
         """
         Parameters
@@ -245,6 +247,9 @@ class IceBlock(Ice):
             ice density to use throughout ice block in units of kg/m^3.
             Defaults to value set in physical_constants.py (917 kg/m^3)
             future versions aim to allow a density profile.
+        creep_table : pd.DataFrame, None, optional
+            creep_table required if include_creep=True. 
+            
 
         """
 
@@ -288,7 +293,8 @@ class IceBlock(Ice):
                                         self.fracture_toughness,
                                         self.virtualblue,
                                         comp_options,
-                                        self.ice_density
+                                        self.ice_density,
+                                        creep_table=creep_table
                                         )
 
         self.detached = False
@@ -364,7 +370,7 @@ class IceBlock(Ice):
         # execute fracture mechanics scheme
         #
 
-        pass
+        
 
     # def resolve_temperatures(self):
     #     """recalculate iceblock temperatures for model timestep"""
