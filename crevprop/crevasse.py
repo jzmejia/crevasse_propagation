@@ -333,7 +333,7 @@ class Crevasse():
         
         
 
-        self.info[0].append(self.crev_width)
+        self.info[0].append(self.width)
         self.info[1].append(self.depth)
         self.info[2].append(self.water_depth)
         
