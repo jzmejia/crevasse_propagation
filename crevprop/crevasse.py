@@ -265,12 +265,13 @@ class Crevasse():
     # def __iter__(self):
     #     return iter(self.instances)
     
-    def crev_width(self):
+    @property
+    def width(self):
         left = self.left_wall
         right = self.right_wall
         
         idx = -2 if np.isnan(left[-1]) or np.isnan(right[-1]) else -1
-        return abs(left[idx])+right[idx]
+        return round(abs(left[idx])+right[idx],4)
     
     
     @property
@@ -559,7 +560,7 @@ class Crevasse():
         self.Vwater = Vwater
         
         
-        
+        print(f'for n={self.n} depth={self.depth} m, width={self.width} m')
         
         return water_depth
     
