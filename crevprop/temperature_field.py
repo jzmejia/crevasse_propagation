@@ -192,6 +192,8 @@ class ThermalModel():
         self.T0 = None
         self.Tnm1 = None
 
+        # initialize refreezing
+
         # For solver to consider horizontal ice velocity a udef term
         # needs to be added at some point
         # For sovler to consider vertical ice velocity need ablation
@@ -333,7 +335,7 @@ class ThermalModel():
             else:
                 crevtip = surface_idx - (abs(np.floor(crev[1]/self.dz))) * nx
 
-            # TODO add in error if crev depth > ice thickness
+            # TODO raise error if crev depth > ice thickness
 
             idx = np.arange(crevtip, surface_idx+nx, nx, dtype=int).tolist()
             crev_idx.append(idx)
@@ -351,9 +353,12 @@ class ThermalModel():
         """
         setattr(self, 'Tmn1', self.T0)
         setattr(self, 'T0', self.T)
+        
+        
 
         if updated_crevasses:
             setattr(self, 'crevasses', updated_crevasses)
+            self.refreezing()
 
         nx = self.ibg.x.size
         crev_idx = self.find_crev_idx(nested=False)
@@ -376,14 +381,14 @@ class ThermalModel():
         idx_surface = rhs.size-nx
         idx = [x+1 for x in crev_idx if x < idx_surface]
         rhs[idx] = rhs[idx] + (self.Lf/self.heat_capacity_intercept
-                               * flatten(self.bluelayer_right))/self.ibg.dx
+                               * self.bluelayer_right[0])/self.ibg.dx
 
         for num, crev in enumerate(self.crev_idx):
             # upstream of crevasse
             if num+1 < len(self.crev_idx) or max(crev) > rhs.size-nx:
                 idx = [x-1 for x in crev if x < idx_surface]
                 rhs[idx] = rhs[idx] + (self.Lf/self.heat_capacity_intercept *
-                                       self.bluelayer_right)/self.ibg.dx
+                                       self.bluelayer_right[0])/self.ibg.dx
 
         # adjust for air in crevasse above water level
         # need to pass water depth from crevasse to crevasse field,

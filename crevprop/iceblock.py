@@ -336,7 +336,7 @@ class IceBlock(Ice):
 
         # update u and v velocity profiles if applicable
 
-        pass
+        
 
     def add_dx(self) -> bool:
         """Should domain expand by dx for this model run"""

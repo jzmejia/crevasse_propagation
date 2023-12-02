@@ -305,6 +305,7 @@ class Crevasse():
         setattr(self, 't', t)
         self.n += 1
         # Vwater = Qin
+        
 
         if Qin > 1e-4 and self.depth < (self.ice_thickness - 10):
             dw = self.crevmorph(Qin)
@@ -333,7 +334,7 @@ class Crevasse():
         
         
 
-        self.info[0].append(self.crev_width)
+        self.info[0].append(self.width)
         self.info[1].append(self.depth)
         self.info[2].append(self.water_depth)
         
@@ -390,7 +391,7 @@ class Crevasse():
             #     start=time()
             
             # reset Vwater (it has had Vfrz added onto it)
-            Vwater = Qin
+            Vwater = self.Vwater+Qin
             
             # vertical coordinate
             dy = 0.1 if abs(Z_elastic) > 30 else 0.01
@@ -546,15 +547,15 @@ class Crevasse():
         self.water_depth = water_depth
         
         # interpolate D back to grid
-        self.left_wall = np.interp(self.z,y,Dleft)
-        self.right_wall = np.interp(self.z,y,Dright)
+        self.left_wall = np.interp(self.z,y,Dleft,left=0)
+        self.right_wall = np.interp(self.z,y,Dright,left=0)
         
         
-        FDiff_left = self.bluelayer[0]+abs(np.interp(self.z,y,FDiff[0]))
-        FDiff_right = self.bluelayer[1]+abs(np.interp(self.z,y,FDiff[1]))
+        FDiff_left = self.bluelayer[0]+abs(np.interp(self.z,y,FDiff[0],left=0))
+        FDiff_right = self.bluelayer[1]+abs(np.interp(self.z,y,FDiff[1],left=0))
         self.bluelayer = (FDiff_left, FDiff_right)
         # self.creep_dt = np.interp(self.z,y,CDiff)
-        self.creep_total = self.creep_total + np.interp(self.z,y,CDiff)
+        self.creep_total = self.creep_total + np.interp(self.z,y,CDiff,left=0)
         
         self.Vfrz = Vfrz
         self.Vwater = Vwater
