@@ -101,10 +101,11 @@ class CrevasseField():
                  virtualblue,
                  comp_options,
                  ice_density,
-                 sigmaT0=120e3,
+                 sigmaT0,
                  wpa=1500,
                  PFA_depth=None,
-                 creep_table=None
+                 creep_table=None,
+                 Qin_annual=None,
                  ):
 
         # model geometry and domian management
@@ -113,9 +114,10 @@ class CrevasseField():
         self.t = 0
         self.n = 0
         self.ice_density = ice_density
+        self.sigmaT0 = min(120e3,sigmaT0)
 
         # define stress field
-        self.stress_field = StressField(sigmaT0, wpa, self.comp_options.blunt)
+        self.stress_field = StressField(self.sigmaT0, wpa, self.comp_options.blunt)
 
         # potential refreezing rate to use for new crevasses
         self.virtualblue0 = self.deconvolve_refreezing(virtualblue)
@@ -138,7 +140,7 @@ class CrevasseField():
         # Qin for timestep using annual value of 10000m^2/year 
         # for 0.5 day timestep we are inputting 13.7m^2 at each timestep
         # or 27.4m^2/day
-        self.Qin = round(10000/SECONDS_IN_YEAR*self.geometry.dt,1)
+        self.Qin = round(Qin_annual/SECONDS_IN_YEAR*self.geometry.dt,1)
         self.PFA_depth = PFA_depth
 
         self.crev_instances = Crevasse.instances
@@ -198,6 +200,8 @@ class CrevasseField():
         self.geometry = updated_geometry
         self.t = t
         self.n += 1
+        
+        # need to execute create crevasse here based on conditions
 
         # calculate stress and Qin for each crevasse and evolve
         for idx, crevasse in enumerate(self.crev_instances):

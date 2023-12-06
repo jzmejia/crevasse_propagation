@@ -199,12 +199,14 @@ class IceBlock(Ice):
         T_bed=None,
         u_surf=200.,
         fracture_toughness=100e3,
+        sigmaT0=120e3,
         ice_density=917,
         blunt=False,
         include_creep=False,
         never_closed=True,
         compressive=False,
-        creep_table=None
+        creep_table=None,
+        Qin_annual=10000,
     ):
         """
         Parameters
@@ -266,6 +268,7 @@ class IceBlock(Ice):
         self.num_years = years_to_run
         self.thermal_freq = thermal_freq
         self.dt_T = self._thermal_timestep(dt, thermal_freq)
+        self.sigmaT0=sigmaT0
 
         # ice block geometry
         self.dx = round(self.calc_dx(self.ibg.length), 4)
@@ -277,7 +280,7 @@ class IceBlock(Ice):
         # temperature field
         self.temperature = ThermalModel(self.ibg,
                                         self.dt_T,
-                                        [(-self.ibg.length, -3)],
+                                        [(-self.ibg.length, -30)],
                                         T_profile,
                                         T_surface,
                                         T_bed,
@@ -294,7 +297,9 @@ class IceBlock(Ice):
                                         self.virtualblue,
                                         comp_options,
                                         self.ice_density,
-                                        creep_table=creep_table
+                                        sigmaT0,
+                                        creep_table=creep_table,
+                                        Qin_annual=Qin_annual,
                                         )
 
         self.detached = False
@@ -362,7 +367,7 @@ class IceBlock(Ice):
         if self.n % self.thermal_freq == 0:
             self.temperature.calc_temperature(self.crev_locs)
 
-        # update refreezing
+        
 
         self.crev_field.evolve_crevasses(self.t, self.ibg)
 
