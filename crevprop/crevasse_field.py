@@ -106,6 +106,7 @@ class CrevasseField():
                  PFA_depth=None,
                  creep_table=None,
                  Qin_annual=None,
+                 mu=1e8
                  ):
 
         # model geometry and domian management
@@ -114,22 +115,23 @@ class CrevasseField():
         self.t = 0
         self.n = 0
         self.ice_density = ice_density
-        self.sigmaT0 = min(120e3,sigmaT0)
+        self.sigmaT0 = min(120e3, sigmaT0)
 
         # define stress field
-        self.stress_field = StressField(self.sigmaT0, wpa, self.comp_options.blunt)
+        self.stress_field = StressField(
+            self.sigmaT0, wpa, self.comp_options.blunt)
 
         # potential refreezing rate to use for new crevasses
         self.virtualblue0 = self.deconvolve_refreezing(virtualblue)
 
         # ice properties
         self.fracture_toughness = fracture_toughness
-        self.mu = 1e8  # 
+        self.mu = mu
 
         # crevasses
         self.xcoords = []
-        
-        # initialize creep 
+
+        # initialize creep
         self.creep = self.creep_init(creep_table)
 
         self.crevasses = self.create_crevasse()
@@ -137,21 +139,19 @@ class CrevasseField():
         # self.crev_locs = [(-self.geometry.length, -0.1)]
         # self.crev_count = len(self.crev_locs)  # self.crevasse_list()
 
-        # Qin for timestep using annual value of 10000m^2/year 
+        # Qin for timestep using annual value of 10000m^2/year
         # for 0.5 day timestep we are inputting 13.7m^2 at each timestep
         # or 27.4m^2/day
-        self.Qin = round(Qin_annual/SECONDS_IN_YEAR*self.geometry.dt,1)
+        self.Qin = round(Qin_annual/SECONDS_IN_YEAR*self.geometry.dt, 1)
         self.PFA_depth = PFA_depth
 
         self.crev_instances = Crevasse.instances
-        
-        
-        
+
         # initialize creep
         # 1. accept in data
-        # 2. reduce data set with model params 
+        # 2. reduce data set with model params
         # (sigma range) and length of time to run model
-        
+
     @property
     def advected_distance(self):
         """Crevasse distance from upglacier IceBlock edge in meters"""
@@ -173,7 +173,7 @@ class CrevasseField():
         crev_info = []
         for crev in self.crev_instances:
             crev_info.append((crev.xcoord, crev.depth, crev.water_depth))
-        print("xcoord, depth, water_depth")
+        # print("xcoord, depth, water_depth")
         return crev_info
 
     @property
@@ -187,7 +187,7 @@ class CrevasseField():
 
     def update_virtualblue(self, vb_tuple):
         """update virtualblue with recalculated values
-        
+
         : tuple[list, list]
         """
         lhs, rhs = vb_tuple
@@ -195,12 +195,14 @@ class CrevasseField():
             crev.virtualblue_left = lhs[idx]
             crev.virtualblue_right = rhs[idx]
 
-    def evolve_crevasses(self, t, updated_geometry):
+    def evolve_crevasses(self, t, updated_geometry, virtualblue=None):
         # update model geometry and time
+        # virtual blue will need to be parsed for multiple crevasses
+
         self.geometry = updated_geometry
         self.t = t
         self.n += 1
-        
+
         # need to execute create crevasse here based on conditions
 
         # calculate stress and Qin for each crevasse and evolve
@@ -208,12 +210,14 @@ class CrevasseField():
             Qin = self.Qin  # fix this
             sigmaCrev = self.stress_field.sigmaT(self.advected_distance[idx])
 
-            crevasse.evolve(Qin, sigmaCrev, t)
+            if virtualblue:
+                crevasse.evolve(Qin, sigmaCrev, t, virtualblue)
+            else:
+                crevasse.evolve(Qin, sigmaCrev, t)
 
         #     crevasse.propagate_fracture(Qin,virtual_blue)
         # update crevasse field with propagated crevase info
         # return anything that is needed
-        
 
     def crevasse_list(self):
         # example
@@ -249,31 +253,31 @@ class CrevasseField():
 
         self.xcoords.append(-self.geometry.length)
         return crev
-    
+
     def creep_init(self, data):
         df1 = data
-        min_sigma=self.stress_field.sigmaT(
+        min_sigma = self.stress_field.sigmaT(
             self.geometry.u_surf*SECONDS_IN_YEAR
-            *self.geometry.num_years)/1e3
-        max_sigma=self.stress_field.sigmaT0/1e3
+            * self.geometry.num_years)/1e3
+        max_sigma = self.stress_field.sigmaT0/1e3
         sigma = inclusive_slice(df1.columns.get_level_values(
-            "sigma").drop_duplicates().to_numpy(),min_sigma,max_sigma)
+            "sigma").drop_duplicates().to_numpy(), min_sigma, max_sigma)
         yrs = inclusive_slice(df1.columns.get_level_values(
-            "years").drop_duplicates().to_numpy(),0,self.geometry.num_years)
-        df = df1.loc(axis=1)[yrs,sigma,:]
+            "years").drop_duplicates().to_numpy(), 0, self.geometry.num_years)
+        df = df1.loc(axis=1)[yrs, sigma, :]
         return df
-        
+
 
 def inclusive_slice(a, a_min, a_max, pad=None):
     """Array subset with values on or outside of given range
-    
+
     Given an interval, the array is clipped to the closest values
     corresponding to the interval edges such that the resulting
     array has the shortest length while encompassing the entire
     value range given by a_min and a_max.
-    
+
     No check is performed to ensure ``a_min < a_max``
-    
+
     Parameters
     ----------
     a : array_like
@@ -286,13 +290,13 @@ def inclusive_slice(a, a_min, a_max, pad=None):
     pad : int or None, optional
         Include additional a values on either side of range.
         Defaults to None.
-    
+
     Returns
     -------
     clipped_array : ndarray
         An array with elements of `a` corresponding to the 
         inclusive range of `a_min` to `a_max`
-    
+
     Examples
     --------
     >>> a = np.array([0,30,60,90,120,150,180])
@@ -300,10 +304,10 @@ def inclusive_slice(a, a_min, a_max, pad=None):
     array([90,120])
     >>> inclusive_slice(a,40,61.7)
     array([30,60,90])
-    
+
     """
     # account for optional padding of window
     i_min = -1 if pad is None else -1-pad
     i_max = 0 if pad is None else pad
-    return a[np.argwhere(a<=a_min).item(i_min):
-        np.argwhere(a>=a_max).item(i_max)+1]
+    return a[np.argwhere(a <= a_min).item(i_min):
+             np.argwhere(a >= a_max).item(i_max)+1]
