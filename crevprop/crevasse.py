@@ -603,6 +603,11 @@ class Crevasse():
         # convert to half-width
         CDiff = CDiff/2
 
+        # fix for abrupt drops in values
+        if np.where(np.diff(CDiff) > 0.0001)[0].size > 0:
+            CDiff[:np.where(np.diff(CDiff) > 0.0001)[0][-1]] = np.nan
+            nans, x = nan_helper(CDiff)
+            CDiff[nans] = np.interp(x(nans), x(~nans), CDiff[~nans])
         return CDiff
 
     def refreezing(self, Z_elastic, water_depth, y, Dleft, Dright):
@@ -1057,3 +1062,21 @@ def tupled_grid_array(df):
     #             + ((2*DENSITY_WATER*g) / pi) * math.sqrt(
     #             self.depth ** 2 - self.water_depth ** 2)
     #             )
+
+
+def nan_helper(y):
+    """Helper to handle indices and logical indices of NaNs.
+
+    Input:
+        - y, 1d numpy array with possible NaNs
+    Output:
+        - nans, logical indices of NaNs
+        - index, a function, with signature indices= index(logical_indices),
+          to convert logical indices of NaNs to 'equivalent' indices
+    Example:
+        >>> # linear interpolation of NaNs
+        >>> nans, x= nan_helper(y)
+        >>> y[nans]= np.interp(x(nans), x(~nans), y[~nans])
+    """
+
+    return np.isnan(y), lambda z: z.nonzero()[0]
