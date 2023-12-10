@@ -29,6 +29,7 @@ Thermal model components include:
 """
 import pandas as pd
 import numpy as np
+from scipy import linalg
 from typing import Union, Tuple
 
 from .physical_constants import DENSITY_WATER
@@ -167,14 +168,15 @@ class ThermalModel():
         self.dt = dt_T
         self.dz = self.ibg.dz if self.ibg.dz >= 5 else 5
 
-        self.z = np.arange(-self.ibg.ice_thickness, self.dz, self.dz) if isinstance(
-            self.dz, int) else np.arange(-self.ibg.ice_thickness, self.dz, self.dz)
+        self.z = np.arange(-self.ibg.ice_thickness, self.dz, self.dz
+                           ) if isinstance(self.dz, int) else np.arange(
+            -self.ibg.ice_thickness, self.dz, self.dz)
 
         self.udef = udef
 
         # crevasse info
         self.crevasses = crevasses
-        self.crev_idx = self.find_crev_idx()
+
         # self.virtualblue = self.refreezing()
 
         # Boundary Conditions
@@ -197,6 +199,10 @@ class ThermalModel():
         # For solver to consider horizontal ice velocity a udef term
         # needs to be added at some point
         # For sovler to consider vertical ice velocity need ablation
+
+    @property
+    def crev_idx(self):
+        return self.find_crev_idx()
 
     @property
     def length(self):
@@ -340,8 +346,6 @@ class ThermalModel():
             idx = np.arange(crevtip, surface_idx+nx, nx, dtype=int).tolist()
             crev_idx.append(idx)
 
-        self.crev_idx = crev_idx
-
         return crev_idx if nested else flatten(crev_idx)
 
     def calc_temperature(self, updated_crevasses=None):
@@ -353,21 +357,17 @@ class ThermalModel():
         """
         setattr(self, 'Tmn1', self.T0)
         setattr(self, 'T0', self.T)
-        
-        
 
         if updated_crevasses:
             setattr(self, 'crevasses', updated_crevasses)
-            self.refreezing()
 
-        nx = self.ibg.x.size
         crev_idx = self.find_crev_idx(nested=False)
-
+        self.refreezing()
+        nx = self.ibg.x.size
         A = self.A_matrix()
 
         # compute rhs
         rhs = self.T.flatten()
-
         # apply boundary conditions
         rhs[flatten(self.crev_idx)] = self.T_crev
         rhs[:nx] = self.T_bed
@@ -380,15 +380,16 @@ class ThermalModel():
         # downstream of creasse
         idx_surface = rhs.size-nx
         idx = [x+1 for x in crev_idx if x < idx_surface]
-        rhs[idx] = rhs[idx] + (self.Lf/self.heat_capacity_intercept
-                               * self.bluelayer_right[0])/self.ibg.dx
+
+        rhs[idx] = rhs[idx] + ((self.Lf/self.heat_capacity_intercept
+                               * self.bluelayer_right[0])/self.ibg.dx)[:-1]
 
         for num, crev in enumerate(self.crev_idx):
             # upstream of crevasse
             if num+1 < len(self.crev_idx) or max(crev) > rhs.size-nx:
                 idx = [x-1 for x in crev if x < idx_surface]
-                rhs[idx] = rhs[idx] + (self.Lf/self.heat_capacity_intercept *
-                                       self.bluelayer_right[0])/self.ibg.dx
+                rhs[idx] = rhs[idx] + ((self.Lf/self.heat_capacity_intercept *
+                                       self.bluelayer_right[0])/self.ibg.dx)[:-1]
 
         # adjust for air in crevasse above water level
         # need to pass water depth from crevasse to crevasse field,
@@ -397,7 +398,8 @@ class ThermalModel():
         # alot of air in big crevasses
 
         # compute solution vector
-        T = np.linalg.solve(A, rhs)
+        T = linalg.solve(A, rhs)
+        self.T = T.reshape(self.T.shape)
         return T.reshape(self.T.shape)
 
     def refreezing(self):
@@ -476,7 +478,7 @@ class ThermalModel():
 
             virblue_r = self.calc_refreezing(self.T_crev, T_down)
             virblue_l = self.calc_refreezing(T_up, self.T_crev
-                        ) if self.ibg.x[0] <= crev[0]-5.6 else -virblue_r
+                                             ) if self.ibg.x[0] <= crev[0]-5.6 else -virblue_r
 
             # save np.arrays to list
             bluelayer_l.append(virblue_l[-len(self.crev_idx[num]):])

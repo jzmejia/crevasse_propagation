@@ -8,6 +8,7 @@ initializing model geometry
 """
 import numpy as np
 from numpy import abs
+from time import time
 import math as math
 from dataclasses import dataclass, InitVar
 
@@ -178,6 +179,8 @@ class IceBlock(Ice):
     ice_density : float, int
         ice density to use throughout ice block in units of kg/m^3.
         Defaults to value set in physical_constants.py (917 kg/m^3)
+    mu : int
+        shear modulus in Pa, defaults to 1e8 
 
 
     Notes
@@ -187,8 +190,8 @@ class IceBlock(Ice):
 
     def __init__(
         self,
-        ice_thickness : float,
-        dz : float,
+        ice_thickness: float,
+        dz: float,
         dt=0.5,
         years_to_run=2,
         years_of_crevasses=2,
@@ -199,12 +202,15 @@ class IceBlock(Ice):
         T_bed=None,
         u_surf=200.,
         fracture_toughness=100e3,
+        sigmaT0=120e3,
         ice_density=917,
         blunt=False,
         include_creep=False,
         never_closed=True,
         compressive=False,
-        creep_table=None
+        creep_table=None,
+        Qin_annual=10000,
+        shear_modulus=1e8
     ):
         """
         Parameters
@@ -249,7 +255,7 @@ class IceBlock(Ice):
             future versions aim to allow a density profile.
         creep_table : pd.DataFrame, None, optional
             creep_table required if include_creep=True. 
-            
+
 
         """
 
@@ -266,6 +272,7 @@ class IceBlock(Ice):
         self.num_years = years_to_run
         self.thermal_freq = thermal_freq
         self.dt_T = self._thermal_timestep(dt, thermal_freq)
+        self.sigmaT0 = sigmaT0
 
         # ice block geometry
         self.dx = round(self.calc_dx(self.ibg.length), 4)
@@ -277,7 +284,7 @@ class IceBlock(Ice):
         # temperature field
         self.temperature = ThermalModel(self.ibg,
                                         self.dt_T,
-                                        [(-self.ibg.length, -3)],
+                                        [(-self.ibg.length, -100)],
                                         T_profile,
                                         T_surface,
                                         T_bed,
@@ -294,7 +301,10 @@ class IceBlock(Ice):
                                         self.virtualblue,
                                         comp_options,
                                         self.ice_density,
-                                        creep_table=creep_table
+                                        sigmaT0,
+                                        creep_table=creep_table,
+                                        Qin_annual=Qin_annual,
+                                        mu=shear_modulus
                                         )
 
         self.detached = False
@@ -336,8 +346,6 @@ class IceBlock(Ice):
 
         # update u and v velocity profiles if applicable
 
-        
-
     def add_dx(self) -> bool:
         """Should domain expand by dx for this model run"""
         di = round(self.n*self.ibg.xmove/self.ibg.dx) - self._added
@@ -360,17 +368,18 @@ class IceBlock(Ice):
 
         # Run temperature solver with updated geometry
         if self.n % self.thermal_freq == 0:
+            t0 = time()
             self.temperature.calc_temperature(self.crev_locs)
-
-        # update refreezing
-
-        self.crev_field.evolve_crevasses(self.t, self.ibg)
+            print(t0-time())
+            self.virtualblue = self._get_virtualblue()
+            self.crev_field.evolve_crevasses(
+                self.t, self.ibg, self.virtualblue)
+        else:
+            self.crev_field.evolve_crevasses(self.t, self.ibg)
 
         # find Qin to use in this timestep
         # execute fracture mechanics scheme
         #
-
-        
 
     # def resolve_temperatures(self):
     #     """recalculate iceblock temperatures for model timestep"""
@@ -414,6 +423,7 @@ class IceBlock(Ice):
         virtualblue_right = []
 
         for num, crev in enumerate(virtualblue_l):
+            # convert from thermal model timestep to crevasse model
             lhs = crev/self.thermal_freq
             rhs = virtualblue_r[num]/self.thermal_freq
 
