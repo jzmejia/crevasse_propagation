@@ -29,6 +29,7 @@ Thermal model components include:
 """
 import pandas as pd
 import numpy as np
+from scipy import linalg
 from typing import Union, Tuple
 
 from .physical_constants import DENSITY_WATER
@@ -397,7 +398,7 @@ class ThermalModel():
         # alot of air in big crevasses
 
         # compute solution vector
-        T = np.linalg.solve(A, rhs)
+        T = linalg.solve(A, rhs)
         self.T = T.reshape(self.T.shape)
         return T.reshape(self.T.shape)
 
