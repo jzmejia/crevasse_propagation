@@ -53,16 +53,16 @@ Note: This content will be moved to the documentation and removed from the `READ
 
 Model parameters to navigate the equations used in `crevasse_propagation` within relevant literature (e.g., Poinar et al., 2017; Van der Veen 2007; Weertman 1964, 1983, 1996).
 
-| parameter                 |               | module | value/units    |
+| parameter                 |               | module | units    |
 | ------------------------- | ------------- | ------ | -------------- |
 | Ice thickness             | H             | `ice_thickness` | m |
 | Ice surface elevation     | s             |     | m.a.s.l. |
 | Crevase spacing           | R             | `crev_spacing`    | m  |
-| Surface runoff rate       | $\dot b$      |     | 0.5 m a$^{-1}$ |
+| Surface runoff rate       | $\dot b$      |     | 0.5 m a $^{-1}$ |
 | Water depth in crevasse   | w             | `water_depth`    | m              |
 | Longitudinal stress       | $\sigma _{y}$ |     |   |
 | Shear modulus             | $\mu$         | `shear_modulus`,`mu` | 0.07-3.9 GPa   |
-| Water flux                | Q             | `Qin` | m$^{2}$a$^{-1}$  |
+| Water flux                | Q             | `Qin` | m $^{2}$ per timestep |
 | Fracture toughness of ice | $K_{IC}$      |     |  |
 
 ### Comparison with notation used in the literature
@@ -72,7 +72,7 @@ Model parameters to navigate the equations used in `crevasse_propagation` within
 | ice thickness                   |            |                   |             |       H       |        |      H      |
 | variable depth                  |            |                   |      y      |       b       | Z      |      z      |
 | crevasse depth                  |            |         L         |      L      |       d       |        |      d      |
-| depth to water surface          |            |                   |   -$y_o$    |       a       | dw     |      w      |
+| depth to water surface          |            |                   |   - $y_o$    |       a       | dw     |      w      |
 | height of water column          |            |                   |             |      d-a      | b      |             |
 | average tensile stress          |            |         T         | $\sigma _A$ |   $R_{xx}$    |        |  $\sigma$   |
 | tensile/compressive stress $^1$ | $\tau (x)$ | $\sigma _{xx}(y)$ | $\sigma _T$ | $\sigma_{xx}$ |        | $\sigma'_y$ |
