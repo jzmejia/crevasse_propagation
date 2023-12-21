@@ -53,7 +53,7 @@ Note: This content will be moved to the documentation and removed from the `READ
 
 Model parameters to navigate the equations used in `crevasse_propagation` within relevant literature (e.g., Poinar et al., 2017; Van der Veen 2007; Weertman 1964, 1983, 1996).
 
-| parameter                 |               | module | value/units    |
+| parameter                 |               | module | units    |
 | ------------------------- | ------------- | ------ | -------------- |
 | Ice thickness             | H             | `ice_thickness` | m |
 | Ice surface elevation     | s             |     | m.a.s.l. |
@@ -62,7 +62,7 @@ Model parameters to navigate the equations used in `crevasse_propagation` within
 | Water depth in crevasse   | w             | `water_depth`    | m              |
 | Longitudinal stress       | $\sigma _{y}$ |     |   |
 | Shear modulus             | $\mu$         | `shear_modulus`,`mu` | 0.07-3.9 GPa   |
-| Water flux                | Q             | `Qin` | m $^{2}$ a $^{-1}$  |
+| Water flux                | Q             | `Qin` | m $^{2}$ per timestep |
 | Fracture toughness of ice | $K_{IC}$      |     |  |
 
 ### Comparison with notation used in the literature
