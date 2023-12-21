@@ -18,16 +18,32 @@ model was originally created by Kristin Poinar (Poinar et al., 2017), written in
 ## Usage
 
 ```python
+import pandas as pd
 from crevprop.iceblock import IceBlock 
 
 # initialize model geometry for a domain with an ice thickness of 500 m and vertical resolution of 1 m.
-ib = IceBlock(500, 1, dt=0.5, thermal_freq=2)
+creep_df = pd.read_csv('creep_deformation_file_name.csv',names=['t','z'])
+ib=IceBlock(1000,
+            1, 
+            dt=1, 
+            years_to_run=2,
+            thermal_freq=365,
+            crev_spacing=30,
+            u_surf=200,
+            T_profile=df,
+            sigmaT0=120e3,
+            creep_table=creep_df,
+            include_creep=True,
+            Qin_annual=5000,
+            shear_modulus=0.1e9
+           )
+
 
 ```
 
 ## Important
 
-This model is currently under development and is not ready for public use.  Module is currently unstable and we can not guarantee the validity of results or functionality until version 1 release scheduled for early 2023. 
+This model is currently under development and is not ready for public use.  Module is currently unstable and we can not guarantee the validity of results or functionality until version 1 release.
 
 ## Model Overview
 
@@ -37,20 +53,17 @@ Note: This content will be moved to the documentation and removed from the `READ
 
 Model parameters to navigate the equations used in `crevasse_propagation` within relevant literature (e.g., Poinar et al., 2017; Van der Veen 2007; Weertman 1964, 1983, 1996).
 
-| parameter                 |               |     | value/units    |
-| ------------------------- | ------------- | --- | -------------- |
-| Ice thickness             | H             |     | m              |
-| Ice surface elevation     | s             |     | m.a.s.l.       |
-| Crevase spacing           | R             |     | 50 m           |
+| parameter                 |               | module | value/units    |
+| ------------------------- | ------------- | ------ | -------------- |
+| Ice thickness             | H             | `ice_thickness` | m |
+| Ice surface elevation     | s             |     | m.a.s.l. |
+| Crevase spacing           | R             | `crev_spacing`    | m  |
 | Surface runoff rate       | $\dot b$      |     | 0.5 m a$^{-1}$ |
-| Water depth in crevasse   | w             |     | m              |
-| Longitudinal stress       | $\sigma _{y}$ |     |                |
-| Shear modulus             | $\mu$         | G   | 0.07-3.9 GPa   |
-| Water flux                | Q             |     |                |
-| Fracture toughness of ice | $K_{IC}$      |     |                |
-
-
-
+| Water depth in crevasse   | w             | `water_depth`    | m              |
+| Longitudinal stress       | $\sigma _{y}$ |     |   |
+| Shear modulus             | $\mu$         | `shear_modulus`,`mu` | 0.07-3.9 GPa   |
+| Water flux                | Q             | `Qin` | m$^{2}$a$^{-1}$  |
+| Fracture toughness of ice | $K_{IC}$      |     |  |
 
 ### Comparison with notation used in the literature
 
