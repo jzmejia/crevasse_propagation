@@ -69,7 +69,7 @@ Weertman 1964, 1983, 1996).
 | Crevase spacing           | R             | `crev_spacing` | m  |
 | Water depth in crevasse   | w             | `water_depth`  | m  |
 | Longitudinal stress       | $\sigma _{y}$ | `sigma_crev`   | kPa  | |
-| Shear modulus             | $\mu$ `mu`    | `shear_modulus`| 0.07-3.9 GPa |
+| Shear modulus             | $\mu$   | `shear_modulus`,`mu`| 0.07-3.9 GPa |
 | Water flux                | Q             | `Qin`          | m $^{2}$ per timestep |
 | Water flux initialization |               | `Qin_annual`   | m $^{2}$ a $^{-1}$ |
 | Fracture toughness of ice | $K_{IC}$      | `fracture_toughness` | Pa m $^{0.5}$  |
