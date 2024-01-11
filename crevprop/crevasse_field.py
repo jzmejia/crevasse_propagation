@@ -1,9 +1,11 @@
+"""
+Crevasse Field container for individual Crevasses.
+"""
+
 import math as math
 import numpy as np
 
 from dataclasses import dataclass
-# from typing import Any, Tuple
-
 
 from .crevasse import Crevasse
 from .physical_constants import SECONDS_IN_YEAR, SECONDS_IN_DAY
@@ -25,6 +27,7 @@ class StressField:
         Whether to blunt stresses within crevasse field.
         Defaults to False.
     """
+
     sigmaT0: int
     wpa: int
     blunt: bool = False
@@ -32,10 +35,10 @@ class StressField:
 
     def sigmaT(self, x):
         """calculate tensile stress x meters from upstream boundary."""
-        return self.sigmaT0 * np.cos(-np.pi/self.wpa*x)
+        return self.sigmaT0 * np.cos(-np.pi / self.wpa * x)
 
 
-class CrevasseField():
+class CrevasseField:
     """Container for all crevasses within model domain
 
     Primary roles:
@@ -95,20 +98,20 @@ class CrevasseField():
 
     """
 
-    def __init__(self,
-                 geometry,
-                 fracture_toughness,
-                 virtualblue,
-                 comp_options,
-                 ice_density,
-                 sigmaT0,
-                 wpa=1500,
-                 PFA_depth=None,
-                 creep_table=None,
-                 Qin_annual=None,
-                 mu=1e8
-                 ):
-
+    def __init__(
+        self,
+        geometry,
+        fracture_toughness,
+        virtualblue,
+        comp_options,
+        ice_density,
+        sigmaT0,
+        wpa=1500,
+        PFA_depth=None,
+        creep_table=None,
+        Qin_annual=None,
+        mu=1e8,
+    ):
         # model geometry and domian management
         self.geometry = geometry
         self.comp_options = comp_options
@@ -118,8 +121,7 @@ class CrevasseField():
         self.sigmaT0 = min(120e3, sigmaT0)
 
         # define stress field
-        self.stress_field = StressField(
-            self.sigmaT0, wpa, self.comp_options.blunt)
+        self.stress_field = StressField(self.sigmaT0, wpa, self.comp_options.blunt)
 
         # potential refreezing rate to use for new crevasses
         self.virtualblue0 = self.deconvolve_refreezing(virtualblue)
@@ -142,7 +144,7 @@ class CrevasseField():
         # Qin for timestep using annual value of 10000m^2/year
         # for 0.5 day timestep we are inputting 13.7m^2 at each timestep
         # or 27.4m^2/day
-        self.Qin = round(Qin_annual/SECONDS_IN_YEAR*self.geometry.dt, 1)
+        self.Qin = round(Qin_annual / SECONDS_IN_YEAR * self.geometry.dt, 1)
         self.PFA_depth = PFA_depth
 
         self.crev_instances = Crevasse.instances
@@ -155,7 +157,7 @@ class CrevasseField():
     @property
     def advected_distance(self):
         """Crevasse distance from upglacier IceBlock edge in meters"""
-        return [-(self.geometry.length-abs(x)) for x in self.xcoords]
+        return [-(self.geometry.length - abs(x)) for x in self.xcoords]
 
     @property
     def crev_info(self):
@@ -166,7 +168,7 @@ class CrevasseField():
         crev_info: list[tuple[float,float,float]]
             tuple of crevasse properties
             xcoord : xcoordinate of crevasse (location) (m)
-            depth : crevasse depth in meters 
+            depth : crevasse depth in meters
             NOTE: check val is negative
             water_depth : water depth below ice surface in meters
         """
@@ -235,35 +237,45 @@ class CrevasseField():
         # initialize via running Crevasse class at init
 
         Qin = 0  # zero value
-        crev = Crevasse(self.geometry.z,
-                        self.geometry.dz,
-                        self.geometry.ice_thickness,
-                        -self.geometry.length,
-                        self.geometry.dt,
-                        Qin,
-                        self.mu,
-                        round(self.stress_field.sigmaT(0)),
-                        self.virtualblue0,
-                        self.t,
-                        ice_density=self.ice_density,
-                        fracture_toughness=self.fracture_toughness,
-                        creep_table=self.creep,
-                        include_creep=self.comp_options.include_creep
-                        )
+        crev = Crevasse(
+            self.geometry.z,
+            self.geometry.dz,
+            self.geometry.ice_thickness,
+            -self.geometry.length,
+            self.geometry.dt,
+            Qin,
+            self.mu,
+            round(self.stress_field.sigmaT(0)),
+            self.virtualblue0,
+            self.t,
+            ice_density=self.ice_density,
+            fracture_toughness=self.fracture_toughness,
+            creep_table=self.creep,
+            include_creep=self.comp_options.include_creep,
+        )
 
         self.xcoords.append(-self.geometry.length)
         return crev
 
     def creep_init(self, data):
         df1 = data
-        min_sigma = self.stress_field.sigmaT(
-            self.geometry.u_surf*SECONDS_IN_YEAR
-            * self.geometry.num_years)/1e3
-        max_sigma = self.stress_field.sigmaT0/1e3
-        sigma = inclusive_slice(df1.columns.get_level_values(
-            "sigma").drop_duplicates().to_numpy(), min_sigma, max_sigma)
-        yrs = inclusive_slice(df1.columns.get_level_values(
-            "years").drop_duplicates().to_numpy(), 0, self.geometry.num_years)
+        min_sigma = (
+            self.stress_field.sigmaT(
+                self.geometry.u_surf * SECONDS_IN_YEAR * self.geometry.num_years
+            )
+            / 1e3
+        )
+        max_sigma = self.stress_field.sigmaT0 / 1e3
+        sigma = inclusive_slice(
+            df1.columns.get_level_values("sigma").drop_duplicates().to_numpy(),
+            min_sigma,
+            max_sigma,
+        )
+        yrs = inclusive_slice(
+            df1.columns.get_level_values("years").drop_duplicates().to_numpy(),
+            0,
+            self.geometry.num_years,
+        )
         df = df1.loc(axis=1)[yrs, sigma, :]
         return df
 
@@ -283,9 +295,9 @@ def inclusive_slice(a, a_min, a_max, pad=None):
     a : array_like
         Array containing elements to clip.
     a_min, a_max : array_like or None
-        Minimum and maximum value. If ``None``, clipping is not 
-        performed on the corresponding edge. 
-        Only one of `a_min` and `a_max` may be ``None``. 
+        Minimum and maximum value. If ``None``, clipping is not
+        performed on the corresponding edge.
+        Only one of `a_min` and `a_max` may be ``None``.
         Both are broadcast against `a`.
     pad : int or None, optional
         Include additional a values on either side of range.
@@ -294,7 +306,7 @@ def inclusive_slice(a, a_min, a_max, pad=None):
     Returns
     -------
     clipped_array : ndarray
-        An array with elements of `a` corresponding to the 
+        An array with elements of `a` corresponding to the
         inclusive range of `a_min` to `a_max`
 
     Examples
@@ -307,7 +319,8 @@ def inclusive_slice(a, a_min, a_max, pad=None):
 
     """
     # account for optional padding of window
-    i_min = -1 if pad is None else -1-pad
+    i_min = -1 if pad is None else -1 - pad
     i_max = 0 if pad is None else pad
-    return a[np.argwhere(a <= a_min).item(i_min):
-             np.argwhere(a >= a_max).item(i_max)+1]
+    return a[
+        np.argwhere(a <= a_min).item(i_min) : np.argwhere(a >= a_max).item(i_max) + 1
+    ]

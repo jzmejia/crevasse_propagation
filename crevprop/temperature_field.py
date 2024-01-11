@@ -40,7 +40,7 @@ def flatten(nested):
     return [item for elem in nested for item in elem]
 
 
-class ThermalModel():
+class ThermalModel:
     """Thermal model used to create IceBlock's temperature field.
 
     Notes
@@ -153,9 +153,8 @@ class ThermalModel():
         thermal_conductivity=2.1,
         ice_density=917,
         latient_heat_of_freezing_ice=3.35e5,
-        thermal_diffusivity=1.09e-6
+        thermal_diffusivity=1.09e-6,
     ):
-
         # define constants consistant with IceBlock
         self.ice_density = ice_density
         self.ki = thermal_conductivity
@@ -168,9 +167,11 @@ class ThermalModel():
         self.dt = dt_T
         self.dz = self.ibg.dz if self.ibg.dz >= 5 else 5
 
-        self.z = np.arange(-self.ibg.ice_thickness, self.dz, self.dz
-                           ) if isinstance(self.dz, int) else np.arange(
-            -self.ibg.ice_thickness, self.dz, self.dz)
+        self.z = (
+            np.arange(-self.ibg.ice_thickness, self.dz, self.dz)
+            if isinstance(self.dz, int)
+            else np.arange(-self.ibg.ice_thickness, self.dz, self.dz)
+        )
 
         self.udef = udef
 
@@ -184,8 +185,7 @@ class ThermalModel():
         self.T_bed = T_bed if T_bed else 0
         self.T_upglacier = self._set_upstream_bc(T_profile)
         # left = upglacier end, right = downglacier
-        self.T = np.outer(self.T_upglacier, np.linspace(
-            1, 0.99, self.ibg.x.size))
+        self.T = np.outer(self.T_upglacier, np.linspace(1, 0.99, self.ibg.x.size))
         self.T_downglacier = self.T[:, -1]
         self.T_crev = 0
 
@@ -227,8 +227,11 @@ class ThermalModel():
         """
         # interpolate temperature profile to match z
         if isinstance(Tprofile, pd.DataFrame):
-            t, z = (1, 0) if Tprofile[Tprofile.columns[0]
-                                      ].is_monotonic_increasing else (0, 1)
+            t, z = (
+                (1, 0)
+                if Tprofile[Tprofile.columns[0]].is_monotonic_increasing
+                else (0, 1)
+            )
             t = Tprofile[Tprofile.columns[t]].values
             z = Tprofile[Tprofile.columns[z]].values
         elif isinstance(Tprofile, Tuple):
@@ -237,9 +240,13 @@ class ThermalModel():
         T = np.interp(self.z, z, t)
 
         # smooth temperature profile with a 25 m window
-        win = self.dz*25 + 2
-        T = pd.concat([pd.Series(T[:win]), pd.Series(T).rolling(
-            win, min_periods=1, center=True).mean()[win:]])
+        win = self.dz * 25 + 2
+        T = pd.concat(
+            [
+                pd.Series(T[:win]),
+                pd.Series(T).rolling(win, min_periods=1, center=True).mean()[win:],
+            ]
+        )
 
         # apply basal temperature condition
         idx = 0 if z[0] < -1 else -1
@@ -291,8 +298,8 @@ class ThermalModel():
         nx = self.ibg.x.size
         # nz = self.z.size
 
-        sx = self.kappa*self.dt / self.ibg.dx**2
-        sz = self.kappa*self.dt / self.dz**2
+        sx = self.kappa * self.dt / self.ibg.dx**2
+        sz = self.kappa * self.dt / self.dz**2
 
         # Apply crevasse location boundary conditions to A
         crev_idx = self.find_crev_idx(nested=False)
@@ -302,16 +309,16 @@ class ThermalModel():
 
         # internal deformation (horizontal )
         for i in range(nx, self.T.size - nx):
-            if i % nx != 0 and i % nx != nx-1 and i not in crev_idx:
-                A[i, i] = 1 + 2*sx + 2*sz - self.dt/self.ibg.dx*self.udef
-                A[i, i-nx] = A[i, i+nx] = -sz
-                A[i, i-1] = -sx
-                A[i, i+1] = -sx + self.dt/self.ibg.dx*self.udef
+            if i % nx != 0 and i % nx != nx - 1 and i not in crev_idx:
+                A[i, i] = 1 + 2 * sx + 2 * sz - self.dt / self.ibg.dx * self.udef
+                A[i, i - nx] = A[i, i + nx] = -sz
+                A[i, i - 1] = -sx
+                A[i, i + 1] = -sx + self.dt / self.ibg.dx * self.udef
 
         return A
 
     def find_crev_idx(self, nested=True):
-        '''creating a list of T matrix indicies for crevasse locations
+        """creating a list of T matrix indicies for crevasse locations
 
         Parameters
         ----------
@@ -326,24 +333,23 @@ class ThermalModel():
         Returns
         -------
             crev_idx : list of crevasse indicies within thermal model
-        '''
+        """
         crev_idx = []
         nx = self.ibg.x.size
 
         for crev in self.crevasses:
             # crevasse index at ice surface
-            surface_idx = (nx * self.z.size - 1) - \
-                abs(round(crev[0]/self.ibg.dx))
+            surface_idx = (nx * self.z.size - 1) - abs(round(crev[0] / self.ibg.dx))
 
             # index at crevasse tip (on thermal model grid)
-            if abs(crev[1]) >= 2*self.dz:
-                crevtip = surface_idx - (abs(np.floor(crev[1]/self.dz))-1)*nx
+            if abs(crev[1]) >= 2 * self.dz:
+                crevtip = surface_idx - (abs(np.floor(crev[1] / self.dz)) - 1) * nx
             else:
-                crevtip = surface_idx - (abs(np.floor(crev[1]/self.dz))) * nx
+                crevtip = surface_idx - (abs(np.floor(crev[1] / self.dz))) * nx
 
             # TODO raise error if crev depth > ice thickness
 
-            idx = np.arange(crevtip, surface_idx+nx, nx, dtype=int).tolist()
+            idx = np.arange(crevtip, surface_idx + nx, nx, dtype=int).tolist()
             crev_idx.append(idx)
 
         return crev_idx if nested else flatten(crev_idx)
@@ -355,11 +361,11 @@ class ThermalModel():
         for the the previous two timesteps
 
         """
-        setattr(self, 'Tmn1', self.T0)
-        setattr(self, 'T0', self.T)
+        setattr(self, "Tmn1", self.T0)
+        setattr(self, "T0", self.T)
 
         if updated_crevasses:
-            setattr(self, 'crevasses', updated_crevasses)
+            setattr(self, "crevasses", updated_crevasses)
 
         crev_idx = self.find_crev_idx(nested=False)
         self.refreezing()
@@ -372,24 +378,38 @@ class ThermalModel():
         rhs[flatten(self.crev_idx)] = self.T_crev
         rhs[:nx] = self.T_bed
         rhs[-nx:] = self.T_surface
-        rhs[np.arange(nx, self.T.size-nx, nx)] = self.T_upglacier[1:-1]
-        rhs[np.arange(2*nx-1, self.T.size-nx, nx)] = self.T_downglacier[1:-1]
+        rhs[np.arange(nx, self.T.size - nx, nx)] = self.T_upglacier[1:-1]
+        rhs[np.arange(2 * nx - 1, self.T.size - nx, nx)] = self.T_downglacier[1:-1]
 
         # apply source term for latent heat near crevasses
 
         # downstream of creasse
-        idx_surface = rhs.size-nx
-        idx = [x+1 for x in crev_idx if x < idx_surface]
+        idx_surface = rhs.size - nx
+        idx = [x + 1 for x in crev_idx if x < idx_surface]
 
-        rhs[idx] = rhs[idx] + ((self.Lf/self.heat_capacity_intercept
-                               * self.bluelayer_right[0])/self.ibg.dx)[:-1]
+        rhs[idx] = (
+            rhs[idx]
+            + (
+                (self.Lf / self.heat_capacity_intercept * self.bluelayer_right[0])
+                / self.ibg.dx
+            )[:-1]
+        )
 
         for num, crev in enumerate(self.crev_idx):
             # upstream of crevasse
-            if num+1 < len(self.crev_idx) or max(crev) > rhs.size-nx:
-                idx = [x-1 for x in crev if x < idx_surface]
-                rhs[idx] = rhs[idx] + ((self.Lf/self.heat_capacity_intercept *
-                                       self.bluelayer_right[0])/self.ibg.dx)[:-1]
+            if num + 1 < len(self.crev_idx) or max(crev) > rhs.size - nx:
+                idx = [x - 1 for x in crev if x < idx_surface]
+                rhs[idx] = (
+                    rhs[idx]
+                    + (
+                        (
+                            self.Lf
+                            / self.heat_capacity_intercept
+                            * self.bluelayer_right[0]
+                        )
+                        / self.ibg.dx
+                    )[:-1]
+                )
 
         # adjust for air in crevasse above water level
         # need to pass water depth from crevasse to crevasse field,
@@ -456,7 +476,7 @@ class ThermalModel():
 
 
         """
-        ind = round(5.6/self.ibg.dx)
+        ind = round(5.6 / self.ibg.dx)
 
         # initalize
         bluelayer_l = []
@@ -465,24 +485,27 @@ class ThermalModel():
         virtualblue_right = []
 
         for num, crev in enumerate(self.crevasses):
-
             # get indicies for all z cooresponding to crevasse
-            ft_idx = np.arange(np.remainder(self.crev_idx[num][-1],
-                                            self.ibg.x.size),
-                               self.crev_idx[num][-1]+self.ibg.x.size,
-                               self.ibg.x.size)
+            ft_idx = np.arange(
+                np.remainder(self.crev_idx[num][-1], self.ibg.x.size),
+                self.crev_idx[num][-1] + self.ibg.x.size,
+                self.ibg.x.size,
+            )
 
             # ice temp on downglacier side of crevasse (right)
             T_down = self.T.flatten()[[x + ind for x in ft_idx]]
             T_up = self.T.flatten()[[x - ind for x in ft_idx]]
 
             virblue_r = self.calc_refreezing(self.T_crev, T_down)
-            virblue_l = self.calc_refreezing(T_up, self.T_crev
-                                             ) if self.ibg.x[0] <= crev[0]-5.6 else -virblue_r
+            virblue_l = (
+                self.calc_refreezing(T_up, self.T_crev)
+                if self.ibg.x[0] <= crev[0] - 5.6
+                else -virblue_r
+            )
 
             # save np.arrays to list
-            bluelayer_l.append(virblue_l[-len(self.crev_idx[num]):])
-            bluelayer_r.append(virblue_r[-len(self.crev_idx[num]):])
+            bluelayer_l.append(virblue_l[-len(self.crev_idx[num]) :])
+            bluelayer_r.append(virblue_r[-len(self.crev_idx[num]) :])
 
             virtualblue_left.append(virblue_l)
             virtualblue_right.append(virblue_r)
@@ -533,11 +556,15 @@ class ThermalModel():
             as it refreezes.
 
         """
-        bluelayer = self.dt * (self.ki/self.Lf/self.ice_density) * (
-            T_crevasse - T_ice) / (round(5.6/self.ibg.dx)*self.ibg.dx)
+        bluelayer = (
+            self.dt
+            * (self.ki / self.Lf / self.ice_density)
+            * (T_crevasse - T_ice)
+            / (round(5.6 / self.ibg.dx) * self.ibg.dx)
+        )
 
         # set to zero if any values are negative
         # if prevent_negatives:
         #     np.place(bluelayer, bluelayer < 0, 0)
 
-        return bluelayer * (DENSITY_WATER/self.ice_density)
+        return bluelayer * (DENSITY_WATER / self.ice_density)
