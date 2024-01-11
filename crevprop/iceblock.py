@@ -31,7 +31,7 @@ class geometry():
     dt : float
         timestep to run crevasse model in days. dt attr access is in
         seconds. 
-    u_surf : float
+    u_surf : float 
         Surface ice velocity in meters per year
     crev_spacing : int
         Crevasse spacing in meters.

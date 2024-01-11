@@ -22,7 +22,11 @@ the material's fracture toughness (KIC)
 from scipy.integrate import trapz
 from numpy.lib.function_base import diff
 from .physical_constants import (
-    DENSITY_ICE, DENSITY_WATER, FRACTURE_TOUGHNESS, POISSONS_RATIO)
+    DENSITY_ICE,
+    DENSITY_WATER,
+    FRACTURE_TOUGHNESS,
+    POISSONS_RATIO,
+)
 import numpy as np
 from numpy import sqrt, abs
 from numpy.polynomial import Polynomial as P
@@ -54,9 +58,9 @@ def F(crevasse_depth, ice_thickness, use_approximation=False):
     ice_thickness : float, int
         ice thickness in meters
     use_approximation: bool
-        whether to use the shallow crevasse approximation. 
-        If ``True`` use 1.12 instead of the polynomial expansion, 
-        if ``False`` use full polynomial expansion in calculation. 
+        whether to use the shallow crevasse approximation.
+        If ``True`` use 1.12 instead of the polynomial expansion,
+        if ``False`` use full polynomial expansion in calculation.
         Defaults to ``False``.
 
 
@@ -72,29 +76,29 @@ def F(crevasse_depth, ice_thickness, use_approximation=False):
 def tensile_stress(Rxx, crevasse_depth, ice_thickness):
     """Calculate the stress intensity factor's tensile component.
 
-    An approximatioin of the polynomial coefficient can be 
+    An approximatioin of the polynomial coefficient can be
     used if the ratio between ``crevasse_depth`` and ``ice_thickness``
-    is less than 0.2. Future work could add an if-statement, 
-    but should test if the full computation with 
+    is less than 0.2. Future work could add an if-statement,
+    but should test if the full computation with
     ``numpy.polynomial.Polynomial`` is faster than the conditional.
 
-    van der Veen (1998)'s formulation of the stress intensity factor for 
+    van der Veen (1998)'s formulation of the stress intensity factor for
     mode I crack opening (:math:`K_I`):
 
     .. math:: K_{I}(1) = F(\lambda) R_{xx}  \sqrt{\pi d}
 
-    where :math:`\lambda = d/H` where *d* is crevasse depth, *H* is 
-    ice thickness, and 
+    where :math:`\lambda = d/H` where *d* is crevasse depth, *H* is
+    ice thickness, and
 
-    .. math:: F(\lambda) = 1.12 - 0.23\lambda + 10.55\lambda^2 
+    .. math:: F(\lambda) = 1.12 - 0.23\lambda + 10.55\lambda^2
     - 12.72\lambda^3 + 30.39\lambda^4
 
-    For shallow crevasses, 
+    For shallow crevasses,
     :math:`F(\lambda \Rightarrow 0) = 1.12  R_{xx}  \sqrt{\pi d}`
 
     Parameters
     ----------
-    Rxx: 
+    Rxx:
         far-field stress or tensile resistive stress
     crevasse_depth: float
         crevasse depth below ice surface in meters
@@ -162,7 +166,7 @@ def water_height(
 
     Returns
     -------
-    water_height : float 
+    water_height : float
         water height above crevasse bottom (m)
         values (0, crevasse_depth) -> boundaries rep a water-free
         crevasse (=0) or a copletely full crevasse (=crevase_depth).
@@ -172,18 +176,19 @@ def water_height(
         (
             fracture_toughness
             - tensile_stress(Rxx, crevasse_depth, ice_thickness)
-            + 0.683 * ice_density * g * sqrt(pi) * crevasse_depth ** 1.5
+            + 0.683 * ice_density * g * sqrt(pi) * crevasse_depth**1.5
         )
         / (0.683 * DENSITY_WATER * g * sqrt(pi))
     ) ** (2 / 3)
 
 
-def water_depth(Rxx,
-                crevasse_depth,
-                ice_thickness,
-                fracture_toughness=FRACTURE_TOUGHNESS,
-                ice_density=DENSITY_ICE
-                ):
+def water_depth(
+    Rxx,
+    crevasse_depth,
+    ice_thickness,
+    fracture_toughness=FRACTURE_TOUGHNESS,
+    ice_density=DENSITY_ICE,
+):
     """Convert water height in crevasse to depth below surface in meters
 
 
@@ -205,9 +210,9 @@ def water_depth(Rxx,
     : float
 
     """
-    return crevasse_depth - water_height(Rxx, fracture_toughness,
-                                         crevasse_depth, ice_thickness,
-                                         ice_density)
+    return crevasse_depth - water_height(
+        Rxx, fracture_toughness, crevasse_depth, ice_thickness, ice_density
+    )
 
 
 def sigma(sigma_T, crevasse_depth, water_depth):
@@ -226,23 +231,23 @@ def sigma(sigma_T, crevasse_depth, water_depth):
         sigma_T
         - (2 * DENSITY_ICE * g * crevasse_depth) / pi
         - DENSITY_WATER * g * water_depth
-        + (2/pi)*DENSITY_WATER * g * water_depth * math.asin(
-            water_depth/crevasse_depth)
-        + ((2*DENSITY_WATER*g) / pi) * math.sqrt(
-            crevasse_depth ** 2 - water_depth ** 2)
+        + (2 / pi)
+        * DENSITY_WATER
+        * g
+        * water_depth
+        * math.asin(water_depth / crevasse_depth)
+        + ((2 * DENSITY_WATER * g) / pi)
+        * math.sqrt(crevasse_depth**2 - water_depth**2)
     )
 
 
-def applied_stress(traction_stress,
-                   crevasse_depth,
-                   water_depth,
-                   has_water=False):
+def applied_stress(traction_stress, crevasse_depth, water_depth, has_water=False):
     """calculated applied stress (sigma_A)
 
     Parameters
     ----------
     traction_stress
-    crevasse_depth : 
+    crevasse_depth :
         crevasse depth in meters from ice surface
     water_depth : float, int
         distance from ice surface to water column within crevasse in m.
@@ -254,37 +259,47 @@ def applied_stress(traction_stress,
         sigma_A
 
     """
-    sigma_A = traction_stress - (2*DENSITY_ICE*g*crevasse_depth)/pi
+    sigma_A = traction_stress - (2 * DENSITY_ICE * g * crevasse_depth) / pi
     if has_water:
-        sigma_A = (sigma_A
-                   - DENSITY_WATER*g*water_depth
-                   + (2/pi) * DENSITY_WATER * g * water_depth *
-                   np.arcsin(water_depth/crevasse_depth)
-                   + (2 * DENSITY_WATER * g * (
-                       crevasse_depth**2 - water_depth**2)**(.5)) / pi
-                   )
+        sigma_A = (
+            sigma_A
+            - DENSITY_WATER * g * water_depth
+            + (2 / pi)
+            * DENSITY_WATER
+            * g
+            * water_depth
+            * np.arcsin(water_depth / crevasse_depth)
+            + (
+                2
+                * DENSITY_WATER
+                * g
+                * (crevasse_depth**2 - water_depth**2) ** (0.5)
+            )
+            / pi
+        )
     return sigma_A
 
 
 def alpha(dislocation_type="edge", crack_opening_mode=None):
-    if dislocation_type == "screw" or crack_opening_mode in [3, 'iii', 'III']:
+    if dislocation_type == "screw" or crack_opening_mode in [3, "iii", "III"]:
         alpha = 1
-    elif dislocation_type == "edge" or crack_opening_mode in [1, 2, 'I', 'II']:
+    elif dislocation_type == "edge" or crack_opening_mode in [1, 2, "I", "II"]:
         alpha = 1 - POISSONS_RATIO
     else:
-        print(f'incorrect function inputs, assuming edge dislocation alpha=1-v')
+        print(f"incorrect function inputs, assuming edge dislocation alpha=1-v")
         alpha = 1 - POISSONS_RATIO
     return alpha
 
 
-def elastic_displacement(z,
-                         sigma_T,
-                         mu,
-                         crevasse_depth,
-                         water_depth,
-                         alpha=(1-POISSONS_RATIO),
-                         has_water=True
-                         ):
+def elastic_displacement(
+    z,
+    sigma_T,
+    mu,
+    crevasse_depth,
+    water_depth,
+    alpha=(1 - POISSONS_RATIO),
+    has_water=True,
+):
     """calculate elastic crevasse wall displacement from applied stress sigma_T.
 
 
@@ -298,12 +313,12 @@ def elastic_displacement(z,
     ----------
     z : np.array
         negative veertical distance from ice surface
-    sigma_T : 
+    sigma_T :
     mu : float, int
         ice softness
     crevasse_depth : float, int
         distance between ice surface and crevasse tip in m (positive).
-    water_depth : 
+    water_depth :
         depth of water surface within crevasse (negative)
     alpha : tuple, optional
         Defaults to (1-POISSONS_RATIO).
@@ -312,29 +327,61 @@ def elastic_displacement(z,
 
     """
     # define D and alpha for a water-free crevasse
-    sigma_A = applied_stress(sigma_T, crevasse_depth,
-                             water_depth, has_water=has_water)
+    sigma_A = applied_stress(sigma_T, crevasse_depth, water_depth, has_water=has_water)
     # define constant to advoid repeated terms in D equation
-    c1 = (2*alpha)/(mu*pi)
-    D = (c1*pi*sigma_A * diff_squares(crevasse_depth, z)
-         + c1*DENSITY_ICE*g*crevasse_depth*diff_squares(crevasse_depth, z)
-         - c1*DENSITY_ICE*g*z**2*0.5 *
-         np.log(sum_over_diff(crevasse_depth, diff_squares(crevasse_depth, z)))
-         )
+    c1 = (2 * alpha) / (mu * pi)
+    D = (
+        c1 * pi * sigma_A * diff_squares(crevasse_depth, z)
+        + c1 * DENSITY_ICE * g * crevasse_depth * diff_squares(crevasse_depth, z)
+        - c1
+        * DENSITY_ICE
+        * g
+        * z**2
+        * 0.5
+        * np.log(sum_over_diff(crevasse_depth, diff_squares(crevasse_depth, z)))
+    )
     if has_water:
-        c1 = c1*DENSITY_WATER*g
-        D = (D - c1*diff_squares(crevasse_depth,
-             water_depth)*diff_squares(crevasse_depth, z)
-             + (c1*(z**2-water_depth**2)*0.5*np.log(abs(sum_over_diff(
-                 diff_squares(crevasse_depth, water_depth),
-                 diff_squares(crevasse_depth, z)))))
-             - c1*water_depth*z*np.log(abs(sum_over_diff(
-                 water_depth*diff_squares(crevasse_depth, z),
-                 z*diff_squares(crevasse_depth, water_depth))))
-             + c1*water_depth**2 *
-             np.log(abs(sum_over_diff(diff_squares(crevasse_depth, z),
-                    diff_squares(crevasse_depth, water_depth))))
-             )
+        c1 = c1 * DENSITY_WATER * g
+        D = (
+            D
+            - c1
+            * diff_squares(crevasse_depth, water_depth)
+            * diff_squares(crevasse_depth, z)
+            + (
+                c1
+                * (z**2 - water_depth**2)
+                * 0.5
+                * np.log(
+                    abs(
+                        sum_over_diff(
+                            diff_squares(crevasse_depth, water_depth),
+                            diff_squares(crevasse_depth, z),
+                        )
+                    )
+                )
+            )
+            - c1
+            * water_depth
+            * z
+            * np.log(
+                abs(
+                    sum_over_diff(
+                        water_depth * diff_squares(crevasse_depth, z),
+                        z * diff_squares(crevasse_depth, water_depth),
+                    )
+                )
+            )
+            + c1
+            * water_depth**2
+            * np.log(
+                abs(
+                    sum_over_diff(
+                        diff_squares(crevasse_depth, z),
+                        diff_squares(crevasse_depth, water_depth),
+                    )
+                )
+            )
+        )
     return abs(D)
 
 
@@ -352,7 +399,7 @@ def sum_over_diff(x, y):
     : float
 
     """
-    return (x+y) / (x-y)
+    return (x + y) / (x - y)
 
 
 def diff_squares(x, y):
@@ -370,7 +417,7 @@ def diff_squares(x, y):
     return np.sqrt(x**2 - y**2)
 
 
-def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
+def density_profile(depth, C=0.02, ice_density=917.0, snow_density=350.0):
     """empirical density-depth relationship from Paterson 1994
 
     Parameters
@@ -387,22 +434,22 @@ def density_profile(depth, C=0.02, ice_density=917., snow_density=350.):
 
     Returns
     -------
-    : float, array 
+    : float, array
         snow density at depth
 
     """
-    return ice_density - (ice_density - snow_density) * np.exp(-C*depth)
+    return ice_density - (ice_density - snow_density) * np.exp(-C * depth)
 
 
 def paterson_empirical_relation(b, rho_i=917, rho_s=350, C=0.02):
-    """depth dependant near-surface density 
+    """depth dependant near-surface density
 
     rho_i=917 kg/m^3
     rho_s=350kg/m^3
     C=0.0165-0.0314 m^-1
 
     """
-    return rho_i - (rho_i - rho_s)*np.exp(-C*b)
+    return rho_i - (rho_i - rho_s) * np.exp(-C * b)
 
 
 def G(b, d, H):
@@ -412,12 +459,14 @@ def G(b, d, H):
     d - crevasse depth
 
     """
-    gamma = b/d
-    lam = d/H
-    G = (3.52*(1-gamma)/(1-lam)**(3/2)
-         - (4.35-5.28*gamma)/(1-lam)**0.5
-         + ((1.3-0.3*gamma**(3.2))/(1-gamma**2)**0.5 + 0.83 - 1.76*gamma)
-         * (1-(1-gamma)*lam))
+    gamma = b / d
+    lam = d / H
+    G = (
+        3.52 * (1 - gamma) / (1 - lam) ** (3 / 2)
+        - (4.35 - 5.28 * gamma) / (1 - lam) ** 0.5
+        + ((1.3 - 0.3 * gamma ** (3.2)) / (1 - gamma**2) ** 0.5 + 0.83 - 1.76 * gamma)
+        * (1 - (1 - gamma) * lam)
+    )
     return G
 
 
@@ -426,28 +475,28 @@ def overburden_stress(b):
     rho_s = 350
     g = 9.81
     C = 0.02
-    return -rho_i*g*b+((rho_i-rho_s)/C)*g*(1-np.exp(-C*b))
+    return -rho_i * g * b + ((rho_i - rho_s) / C) * g * (1 - np.exp(-C * b))
 
 
 def f2(b, d, H, rhoi=917, rhos=350, C=0.02):
     """integral within the equation for KI(2) van der veen 1998"""
-    return (-b+(rhoi-rhos)/(rhoi*C)*(1-np.exp(-C*b)))*G(b, d, H)
+    return (-b + (rhoi - rhos) / (rhoi * C) * (1 - np.exp(-C * b))) * G(b, d, H)
 
 
 def f3(a, b, d, H):
-    return (b-a)*G(b, d, H)
+    return (b - a) * G(b, d, H)
 
 
 def evaluate_KI1(d, H, Rxx):
     """
 
     Rxx :
-        resistive stress - normal stress responsible for crevasse 
-        opening defined as the full stress sigma_xx minus the 
+        resistive stress - normal stress responsible for crevasse
+        opening defined as the full stress sigma_xx minus the
         weight-inducedlithostatic stress, L
     """
     p = P([1.12, -0.23, 10.55, -21.72, 30.39])
-    return p(d/H)*Rxx*np.sqrt(np.pi*d)
+    return p(d / H) * Rxx * np.sqrt(np.pi * d)
 
 
 def evaluate_KI2(d, H, rhoi=917, rhos=350, C=0.02):
@@ -455,7 +504,7 @@ def evaluate_KI2(d, H, rhoi=917, rhos=350, C=0.02):
     x = np.arange(0, d, 0.01)
     f = f2(x, d, H, rhoi=rhoi, rhos=rhos, C=C)
     i_trapz = trapz(f, x)
-    return (((2*rhoi*9.81)/np.sqrt(np.pi*d)) * i_trapz)/1e6
+    return (((2 * rhoi * 9.81) / np.sqrt(np.pi * d)) * i_trapz) / 1e6
 
 
 def evaluate_KI3(a, d, H):
@@ -468,12 +517,15 @@ def evaluate_KI3(a, d, H):
     """
     x = np.arange(a, d, 0.01)
     f = f3(a, x, d, H)
-    return ((2*1000*9.81)/np.sqrt(np.pi*d)*trapz(f, x))/1e6 if d > a else 0
+    return ((2 * 1000 * 9.81) / np.sqrt(np.pi * d) * trapz(f, x)) / 1e6 if d > a else 0
 
 
 def evaluate_KInet(d, H, Rxx, a, rhoi=917, rhos=350, C=0.02):
-    return evaluate_KI1(d,H,Rxx) + evaluate_KI2(d,H,rhoi=rhoi,rhos=rhos,C=C
-                                                ) + evaluate_KI3(a,d,H)
+    return (
+        evaluate_KI1(d, H, Rxx)
+        + evaluate_KI2(d, H, rhoi=rhoi, rhos=rhos, C=C)
+        + evaluate_KI3(a, d, H)
+    )
 
 
 def penetration_depth_equ(d, H, Rxx, KIC):
@@ -487,7 +539,7 @@ def penetration_depth_equ(d, H, Rxx, KIC):
 
 
     """
-    return evaluate_KI1(d, H, Rxx)+evaluate_KI2(d, H)-KIC
+    return evaluate_KI1(d, H, Rxx) + evaluate_KI2(d, H) - KIC
 
 
 def penetration_depth_approx(H, Rxx, KIC):
