@@ -111,6 +111,7 @@ class CrevasseField:
         creep_table=None,
         Qin_annual=None,
         mu=1e8,
+        initial_depth=None,
     ):
         # model geometry and domian management
         self.geometry = geometry
@@ -132,6 +133,7 @@ class CrevasseField:
 
         # crevasses
         self.xcoords = []
+        self.initial_depth = initial_depth
 
         # initialize creep
         self.creep = self.creep_init(creep_table)
@@ -252,6 +254,7 @@ class CrevasseField:
             fracture_toughness=self.fracture_toughness,
             creep_table=self.creep,
             include_creep=self.comp_options.include_creep,
+            initial_depth=self.initial_depth,
         )
 
         self.xcoords.append(-self.geometry.length)

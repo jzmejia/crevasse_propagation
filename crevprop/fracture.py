@@ -19,6 +19,7 @@ which describes the stresses at the fracture's tip
 the material's fracture toughness (KIC)
 
 """
+
 from scipy.integrate import trapz
 from numpy.lib.function_base import diff
 from .physical_constants import (
@@ -236,8 +237,7 @@ def sigma(sigma_T, crevasse_depth, water_depth):
         * g
         * water_depth
         * math.asin(water_depth / crevasse_depth)
-        + ((2 * DENSITY_WATER * g) / pi)
-        * math.sqrt(crevasse_depth**2 - water_depth**2)
+        + ((2 * DENSITY_WATER * g) / pi) * math.sqrt(crevasse_depth**2 - water_depth**2)
     )
 
 
@@ -269,12 +269,7 @@ def applied_stress(traction_stress, crevasse_depth, water_depth, has_water=False
             * g
             * water_depth
             * np.arcsin(water_depth / crevasse_depth)
-            + (
-                2
-                * DENSITY_WATER
-                * g
-                * (crevasse_depth**2 - water_depth**2) ** (0.5)
-            )
+            + (2 * DENSITY_WATER * g * (crevasse_depth**2 - water_depth**2) ** (0.5))
             / pi
         )
     return sigma_A
@@ -487,16 +482,51 @@ def f3(a, b, d, H):
     return (b - a) * G(b, d, H)
 
 
-def evaluate_KI1(d, H, Rxx):
+def evaluate_KI1(d, H, Rxx, simplify=True):
     """
+    Stress intensity factor for tensile normal stress
 
+    Parameters
+    ----------
+    d : crevasse depth in meters
+    H : ice thickness in meters
     Rxx :
-        resistive stress - normal stress responsible for crevasse
-        opening defined as the full stress sigma_xx minus the
-        weight-inducedlithostatic stress, L
+        resistive stress - normal stress responsible for crevasse opening
+        defined as the full stress sigma_xx minus the weight-induced
+        lithostatic stress, L
+
+    Returns
+    -------
+    KI1 in units of MPa
     """
     p = P([1.12, -0.23, 10.55, -21.72, 30.39])
-    return p(d / H) * Rxx * np.sqrt(np.pi * d)
+    return (
+        (1.12 * Rxx * np.sqrt(np.pi * d)) / 1e6
+        if simplify
+        else (p(d / H) * Rxx * np.sqrt(np.pi * d)) / 1e6
+    )
+
+
+def KI1_shielding(d, Rxx, crev_spacing):
+    W = crev_spacing / 2
+    S = W / (W + d)
+    n = 1 / np.sqrt(np.pi)
+    p = P(
+        [
+            n,
+            n * 0.5,
+            n * (3 / 8),
+            n * (5 / 16),
+            n * (35 / 128),
+            n * (63 / 256),
+            n * (231 / 1024),
+            22.501,
+            -63.502,
+            58.045,
+            -17.577,
+        ]
+    )
+    return (p(S) * Rxx * np.sqrt(np.pi * d * S)) / 1e6
 
 
 def evaluate_KI2(d, H, rhoi=917, rhos=350, C=0.02):
@@ -528,20 +558,57 @@ def evaluate_KInet(d, H, Rxx, a, rhoi=917, rhos=350, C=0.02):
     )
 
 
-def penetration_depth_equ(d, H, Rxx, KIC):
+def penetration_depth_equ(d, H, Rxx, KIC, rhos=350, crev_spacing=None):
+    """calculate crevasse penetration depth for a single crevasse
+
+    Parameters
+    ----------
+    d : np.array, list, iterable
+        depth vector to use for calculations
+    H : int, float
+        ice thickness in meters.
+    Rxx : float, int
+        Tensile stress in kPa
+    KIC : float, int
+        fracture toughness in MPa
+    rhos : int, optional
+        surface density to use in kg/m^3, by default 350 kg/m^3 for firn
+    crev_spacing : _type_, optional
+        spacing between crevasses in meters. If a value is given
+        calculations will include the effect of shielding within the
+        crevasse field (resulting in shallower initial crevasse depths).
+        By default None, and the effect of shielding is ignored.
+
+    Returns
+    -------
+    crevasse depth: float, int
+        initial crevasse depth in meters.
     """
-    penetration of a single crevasse equation
-
-    d -depth
-    H-ice thickness
-    Rxx - Rxx in Pa
-    KIC = fracture toughness in MPa
+    K1 = (
+        KI1_shielding(d, Rxx, crev_spacing) if crev_spacing else evaluate_KI1(d, H, Rxx)
+    )
+    return K1 + evaluate_KI2(d, H, rhos=rhos) - KIC
 
 
+def find_crev_depth(H, Rxx, KIC, rhos=350, crev_spacing=None):
+    """find initial crevasse depth for a water-free crevasse
+
+    H: ice thickness
+    Rxx: surface stress
+    KIC: fracture toughness of ice
+    rhos: surface density, defautls to 350 kg/m^3
     """
-    return evaluate_KI1(d, H, Rxx) + evaluate_KI2(d, H) - KIC
-
-
-def penetration_depth_approx(H, Rxx, KIC):
-    d = np.arange(0, 100)
-    vals = np.asarray([penetration_depth_equ(x, H, Rxx, KIC) for x in d])
+    d = np.arange(50)
+    if crev_spacing:
+        xx = np.array(
+            [
+                KI1_shielding(x, Rxx, crev_spacing) + evaluate_KI2(x, H, rhos=rhos)
+                for x in d
+            ]
+        )
+    else:
+        xx = np.array(
+            [evaluate_KI1(x, H, Rxx) + evaluate_KI2(x, H, rhos=rhos) for x in d]
+        )
+    d_final = d[np.where(xx >= KIC)[0][-1]] if len(d[np.where(xx >= KIC)[0]]) > 0 else 0
+    return round(d_final, 1)

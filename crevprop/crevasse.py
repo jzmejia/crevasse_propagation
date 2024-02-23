@@ -47,6 +47,7 @@ Takes into account
 3. Refreezing rate(diffusion and temperature gradient at sidewalls)
 
 """
+
 import math as math
 import numpy as np
 from time import time
@@ -197,6 +198,7 @@ class Crevasse:
         include_creep=False,
         never_closed=False,
         creep_table=None,
+        initial_depth=None,
     ):
         self.z = z
         self.dz = dz
@@ -214,7 +216,7 @@ class Crevasse:
         self.sigma_crev = sigma_crev
 
         # dynamic, set initial crev conditions
-        self.depth = 10
+        self.depth = initial_depth if not None else 10
         self.volume = 1e-15
 
         # water-filled crevasse
