@@ -1,4 +1,6 @@
 """
+(c) 2024 Jessica Mejia
+
 fracture mechanics used in crevasse propagation model
 
 Linear elastic fracture mechanics scheme for crevasse propagation
@@ -439,20 +441,54 @@ def density_profile(depth, C=0.02, ice_density=917.0, snow_density=350.0):
 def paterson_empirical_relation(b, rho_i=917, rho_s=350, C=0.02):
     """depth dependant near-surface density
 
-    rho_i=917 kg/m^3
-    rho_s=350kg/m^3
-    C=0.0165-0.0314 m^-1
+    Curve representing the transition from surface density to ice at
+    depth.
 
+    rho(b) = density_ice - (density_ice - density_surface)*e^-Cb
+
+
+    Parameters
+    ----------
+    b : _type_
+        _description_
+    rho_i : int, optional
+        ice density in kg/m^3, by default 917
+    rho_s : int, optional
+        surface densit in kg/m^3, by default 350 for seasonal snow
+    C : float, optional
+        empirical constant in units of m^-1 and can range from 0.0165
+        to 0.0314 m^-1, by default 0.02 m^-1. Controls the rate at which
+        firn density approaches ice.
+
+    Returns
+    -------
+    rho(b)
     """
     return rho_i - (rho_i - rho_s) * np.exp(-C * b)
 
 
 def G(b, d, H):
-    """G(b,d) for given H-ice thickness from van der veen 1997
+    """Functional expression G in KI2 evaluation.
 
-    b - depth below surface
-    d - crevasse depth
+    G(gamma,lambda) where gamma=b/d, lambda=d/H
+    from Tada et al., 1973 p 2.27, based on polynomial curve fitting to
+    numerically derived solutions for the second component of the stress
+    intensity factor KI2 for mode I crack opening. Implementiation also
+    in van der veen, 1998 equ 12 and use in the intergral described in
+    equ 14. p37.
 
+    Parameters
+    ----------
+    b : float, int
+        depth below surface
+    d : float, int
+        crevasse depth in meters.
+    H : float, int
+        ice thickness in meters
+
+    Returns
+    -------
+    G : float
     """
     gamma = b / d
     lam = d / H
@@ -466,6 +502,18 @@ def G(b, d, H):
 
 
 def overburden_stress(b):
+    """ice overburden stress as a function of depth acconting for firn
+
+    Parameters
+    ----------
+    b : int, float
+        depth b in meters
+
+    Returns
+    -------
+    float, int
+        overburden stress in kPa
+    """
     rho_i = 917
     rho_s = 350
     g = 9.81
@@ -482,32 +530,82 @@ def f3(a, b, d, H):
     return (b - a) * G(b, d, H)
 
 
-def evaluate_KI1(d, H, Rxx, simplify=True):
-    """
-    Stress intensity factor for tensile normal stress
+def evaluate_KI1(d, H, Rxx, simplify=True, crev_spacing=None):
+    """Stress intensity factor for tensile normal stress
 
     Parameters
     ----------
-    d : crevasse depth in meters
-    H : ice thickness in meters
-    Rxx :
-        resistive stress - normal stress responsible for crevasse opening
+    d : int, float
+        crevasse depth in meters
+    H : int, float
+        ice thickness in meters
+    Rxx : int, float
+        resistive stress in kPa, normal stress responsible for crevasse opening
         defined as the full stress sigma_xx minus the weight-induced
-        lithostatic stress, L
+        lithostatic stress, L.
+    simplify : bool, optional
+        use simplification for shallow crevasses instead of polynomial
+        curve fit to numerically computered stress intensity factors
+        accounting for crevasse depth in proportion to ice thickness,
+        by default True
+    crev_spacing : int, float, optional
+        spacing between crevasses in meters. If a value is given
+        calculations will include the effect of shielding within the
+        crevasse field (resulting in shallower initial crevasse depths).
+        By default None, and the effect of shielding is ignored.
 
     Returns
     -------
-    KI1 in units of MPa
+    KI1: float, int
+        KI1 in units of MPa
     """
-    p = P([1.12, -0.23, 10.55, -21.72, 30.39])
-    return (
-        (1.12 * Rxx * np.sqrt(np.pi * d)) / 1e6
-        if simplify
-        else (p(d / H) * Rxx * np.sqrt(np.pi * d)) / 1e6
-    )
+    if crev_spacing:
+        W = crev_spacing / 2
+        S = W / (W + d)
+        n = 1 / np.sqrt(np.pi)
+        p = P(
+            [
+                n,
+                n * 0.5,
+                n * (3 / 8),
+                n * (5 / 16),
+                n * (35 / 128),
+                n * (63 / 256),
+                n * (231 / 1024),
+                22.501,
+                -63.502,
+                58.045,
+                -17.577,
+            ]
+        )
+        KI1 = p(S) * Rxx * np.sqrt(np.pi * d * S)
+    else:
+        p = P([1.12, -0.23, 10.55, -21.72, 30.39])
+        F = 1.12 if simplify else p(d / H)
+        KI1 = F * Rxx * np.sqrt(np.pi * d)
+    return KI1 / 1e6
 
 
 def KI1_shielding(d, Rxx, crev_spacing):
+    """KI1 accounting for opening and consider effect of shielding
+
+    Parameters
+    ----------
+    d : _type_
+        _description_
+    Rxx : _type_
+        _description_
+    crev_spacing : float, int, optional
+        spacing between crevasses in meters. If a value is given
+        calculations will include the effect of shielding within the
+        crevasse field (resulting in shallower initial crevasse depths).
+        By default None, and the effect of shielding is ignored.
+
+    Returns
+    -------
+    float, int
+        KI1 in kPa
+    """
     W = crev_spacing / 2
     S = W / (W + d)
     n = 1 / np.sqrt(np.pi)
@@ -538,12 +636,22 @@ def evaluate_KI2(d, H, rhoi=917, rhos=350, C=0.02):
 
 
 def evaluate_KI3(a, d, H):
-    """Units of MPa
+    """stress intensity factor component for a water-filled crevasse
 
-    a - water depth below surface
-    d - crevasse depth
-    H - ice thickness
+    Parameters
+    ----------
+    a : float, int
+        water depth below surface in meters
+    d : float, int
+        crevasse depth in meters
+    H : float, int
+        ice thickness in meters
 
+    Returns
+    -------
+    KI3: float
+        The third component of the stress intensity factor for mode I
+        opening in units of kPa.
     """
     x = np.arange(a, d, 0.01)
     f = f3(a, x, d, H)
@@ -573,7 +681,7 @@ def penetration_depth_equ(d, H, Rxx, KIC, rhos=350, crev_spacing=None):
         fracture toughness in MPa
     rhos : int, optional
         surface density to use in kg/m^3, by default 350 kg/m^3 for firn
-    crev_spacing : _type_, optional
+    crev_spacing : float, int, optional
         spacing between crevasses in meters. If a value is given
         calculations will include the effect of shielding within the
         crevasse field (resulting in shallower initial crevasse depths).
@@ -593,10 +701,26 @@ def penetration_depth_equ(d, H, Rxx, KIC, rhos=350, crev_spacing=None):
 def find_crev_depth(H, Rxx, KIC, rhos=350, crev_spacing=None):
     """find initial crevasse depth for a water-free crevasse
 
-    H: ice thickness
-    Rxx: surface stress
-    KIC: fracture toughness of ice
-    rhos: surface density, defautls to 350 kg/m^3
+    Parameters
+    ----------
+    H : float, int
+        ice thickness in meters
+    Rxx : float, int
+        surface stress responsible for crevasse opening in kPa
+    KIC : float, int
+       fracture toughness of ice in MPa
+    rhos : int, optional
+        surface density, defautls to 350 kg/m^3, by default 350
+    crev_spacing : float, int, optional
+        spacing between crevasses in meters. If a value is given
+        calculations will include the effect of shielding within the
+        crevasse field (resulting in shallower initial crevasse depths).
+        By default None, and the effect of shielding is ignored.
+
+    Returns
+    -------
+    float, int
+        iniital crevasse depth upon creation in meters.
     """
     d = np.arange(50)
     if crev_spacing:
