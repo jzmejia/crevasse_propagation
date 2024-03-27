@@ -1,4 +1,5 @@
 """
+(c) 2021-2024 J. Mejia
 
 Model Geometry
   + → x

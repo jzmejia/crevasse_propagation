@@ -1,5 +1,5 @@
 """
-Copyright (c) 2021-2023 by Jessica Mejia <jzmejia@buffalo.edu>
+Copyright (c) 2021-2024 by Jessica Mejia <jzmejia@buffalo.edu>
 
 
 
@@ -232,12 +232,13 @@ class IceBlock(Ice):
             How many years of doman to track crevasses for, before
             iceblock becomes detached to upstream boundary.
             Defaults to 2 years.
-        crev_spacing : float, int
-            Spacing between crevasses in crevasse field (m)
         thermal_freq : float, int
             Multiple of timestep to run thermal model. 1 would run the
             thermal model at every timestep whereas a value of 5 would
             run the model after every 5 timesteps. Defaults to 5.
+        crev_spacing : float, int
+            Spacing between crevasses in crevasse field (m). Defaults to
+            30 m.
         T_profile : np.array, pd.Series, pd.DataFrame, optional
             Temperature profile for upstream boundary condition. The
             profile will be interpolated to match the thermal model's
@@ -253,14 +254,25 @@ class IceBlock(Ice):
         fracture_toughness : float
             value to use for fracture toughness of ice (Pa), defaults
             to 0.1 MPa.
+        sigmaT0: int
+            Initial surface stress in Pa at start of the crevasse field
+            where crevasses are nucleated. Defaults to 120,000 Pa.
         ice_density : float, int
             ice density to use throughout ice block in units of kg/m^3.
             Defaults to value set in physical_constants.py (917 kg/m^3)
             future versions aim to allow a density profile.
+        blunt: bool
+            Defaults to false. Include the effect of blunting/shielding
+            of multiple crevasses in a crevasse field. Acts to reduce
+            crevasse depth.
         creep_table : pd.DataFrame, None, optional
             creep_table required if include_creep=True.
-
-
+        Qin_annual: float
+            Annual water flux to put into crevasses with units of
+            m^2/year. Defaults to 10,000 m^2 per year.
+        shear_modulus: float
+            shear modulus of ice in Pascals. Suitable values for ice are
+            in the range 0.07-3.9 GPa. Defaults to 1e8 Pa.
         """
 
         super().__init__(ice_density, fracture_toughness)

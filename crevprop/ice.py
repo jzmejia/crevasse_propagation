@@ -1,11 +1,12 @@
 """
-Copyright (c) 2021-2023 by Jessica Mejia <jzmejia@buffalo.edu>
+Copyright (c) 2021-2024 by Jessica Mejia <jzmejia@buffalo.edu>
 
 
 
 The main container for the crevasse propagation model, holding and
 initializing model geometry
 """
+
 import numpy as np
 
 
@@ -23,10 +24,7 @@ class Ice(object):
         ice temperature in degrees Celcius
     """
 
-    def __init__(self,
-                 ice_density=917.,
-                 ice_temperature=0,
-                 fracture_toughness=100e3):
+    def __init__(self, ice_density=917.0, ice_temperature=0, fracture_toughness=100e3):
         """_summary_
 
         Parameters
@@ -158,17 +156,18 @@ class Ice(object):
         thermal diffusivity with units of m^2/s
         """
         return self.thermal_conductivity / (
-            self.ice_density * self.specific_heat_capacity)
+            self.ice_density * self.specific_heat_capacity
+        )
 
     def _set_unit(self):
         units = {
-            'density': 'kg/m^3',
-            'thermal conductivity': 'J/m/K/s',
-            'thermal diffusivity': 'm^2/s',
-            'latient heat of freezing': 'J/kg',
-            'heat capacity': 'J/kg/K',
-            'melting point at 1 atm': 'K',
-            'fracture toughness': 'MPa m^-1/2',
-            'driving stress': 'kPa'
+            "density": "kg/m^3",
+            "thermal conductivity": "J/m/K/s",
+            "thermal diffusivity": "m^2/s",
+            "latient heat of freezing": "J/kg",
+            "heat capacity": "J/kg/K",
+            "melting point at 1 atm": "K",
+            "fracture toughness": "MPa m^-1/2",
+            "driving stress": "kPa",
         }
         return units

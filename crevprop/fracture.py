@@ -243,7 +243,9 @@ def sigma(sigma_T, crevasse_depth, water_depth):
     )
 
 
-def applied_stress(traction_stress, crevasse_depth, water_depth, has_water=False):
+def applied_stress(
+    traction_stress, crevasse_depth, water_depth, has_water=False, density=DENSITY_ICE
+):
     """calculated applied stress (sigma_A)
 
     Parameters
@@ -261,7 +263,7 @@ def applied_stress(traction_stress, crevasse_depth, water_depth, has_water=False
         sigma_A
 
     """
-    sigma_A = traction_stress - (2 * DENSITY_ICE * g * crevasse_depth) / pi
+    sigma_A = traction_stress - (2 * density * g * crevasse_depth) / pi
     if has_water:
         sigma_A = (
             sigma_A
@@ -296,6 +298,7 @@ def elastic_displacement(
     water_depth,
     alpha=(1 - POISSONS_RATIO),
     has_water=True,
+    density=DENSITY_ICE,
 ):
     """calculate elastic crevasse wall displacement from applied stress sigma_T.
 
@@ -312,7 +315,7 @@ def elastic_displacement(
         negative veertical distance from ice surface
     sigma_T :
     mu : float, int
-        ice softness
+        ice softness/shear modulus
     crevasse_depth : float, int
         distance between ice surface and crevasse tip in m (positive).
     water_depth :
@@ -324,18 +327,22 @@ def elastic_displacement(
 
     """
     # define D and alpha for a water-free crevasse
-    sigma_A = applied_stress(sigma_T, crevasse_depth, water_depth, has_water=has_water)
+    sigma_A = applied_stress(
+        sigma_T, crevasse_depth, water_depth, has_water=has_water, density=density
+    )
     # define constant to advoid repeated terms in D equation
     c1 = (2 * alpha) / (mu * pi)
     D = (
         c1 * pi * sigma_A * diff_squares(crevasse_depth, z)
-        + c1 * DENSITY_ICE * g * crevasse_depth * diff_squares(crevasse_depth, z)
-        - c1
-        * DENSITY_ICE
-        * g
-        * z**2
-        * 0.5
-        * np.log(sum_over_diff(crevasse_depth, diff_squares(crevasse_depth, z)))
+        + c1 * density * g * crevasse_depth * diff_squares(crevasse_depth, z)
+        - (
+            c1
+            * density
+            * g
+            * z**2
+            * 0.5
+            * np.log(sum_over_diff(crevasse_depth, diff_squares(crevasse_depth, z)))
+        )
     )
     if has_water:
         c1 = c1 * DENSITY_WATER * g
@@ -449,8 +456,8 @@ def paterson_empirical_relation(b, rho_i=917, rho_s=350, C=0.02):
 
     Parameters
     ----------
-    b : _type_
-        _description_
+    b : np.array
+        array of depth below ice/snow surface in meters
     rho_i : int, optional
         ice density in kg/m^3, by default 917
     rho_s : int, optional
@@ -462,7 +469,9 @@ def paterson_empirical_relation(b, rho_i=917, rho_s=350, C=0.02):
 
     Returns
     -------
-    rho(b)
+    rho(b) : np.array
+        density as a function of depth in kg/m^3 corresponding to the
+        b array input to function.
     """
     return rho_i - (rho_i - rho_s) * np.exp(-C * b)
 
@@ -698,7 +707,7 @@ def penetration_depth_equ(d, H, Rxx, KIC, rhos=350, crev_spacing=None):
     return K1 + evaluate_KI2(d, H, rhos=rhos) - KIC
 
 
-def find_crev_depth(H, Rxx, KIC, rhos=350, crev_spacing=None):
+def find_crev_depth(H, Rxx, KIC, rhos=350, crev_spacing=None, d=None):
     """find initial crevasse depth for a water-free crevasse
 
     Parameters
@@ -716,11 +725,16 @@ def find_crev_depth(H, Rxx, KIC, rhos=350, crev_spacing=None):
         calculations will include the effect of shielding within the
         crevasse field (resulting in shallower initial crevasse depths).
         By default None, and the effect of shielding is ignored.
+    d : np.array
+        depth array to use to solve for initial crevasse. Units in
+        meters. NOTE: the resolution of this array corresponds to the
+        precision of the calculated result. Defaults to np.arange(50)
+        producing crevasse depth rounded with no decimal places.
 
     Returns
     -------
-    float, int
-        iniital crevasse depth upon creation in meters.
+    crev_depth: float, int
+        inital crevasse depth upon creation in meters.
     """
     d = np.arange(50)
     if crev_spacing:

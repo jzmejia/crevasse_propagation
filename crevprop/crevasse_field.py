@@ -1,4 +1,6 @@
 """
+(c) 2021-2024 Jessica Mejia
+
 Crevasse Field container for individual Crevasses.
 """
 
