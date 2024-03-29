@@ -239,30 +239,48 @@ def sigma(sigma_T, crevasse_depth, water_depth):
         * g
         * water_depth
         * math.asin(water_depth / crevasse_depth)
-        + ((2 * DENSITY_WATER * g) / pi) * math.sqrt(crevasse_depth**2 - water_depth**2)
+        + ((2 * DENSITY_WATER * g) / pi)
+        * math.sqrt(crevasse_depth**2 - water_depth**2)
     )
 
 
 def applied_stress(
-    traction_stress, crevasse_depth, water_depth, has_water=False, density=DENSITY_ICE
+    traction_stress,
+    crevasse_depth,
+    water_depth,
+    has_water=False,
+    density=DENSITY_ICE,
 ):
     """calculated applied stress (sigma_A)
 
+    applied stress = traction stress - ice density * g * |y|
+
+    where traction stress, sigma_T, is the tensile stress within the ice
+    ice density (or density of medium)
+    g is gravitational acceleration
+    y is depth below surface in meters (negative), thus the absolute
+
+    sigma_A = sigma_T - (2*g*density*crev_depth)/pi
+
     Parameters
     ----------
-    traction_stress
+    traction_stress : float, int
+        surface stress in Pa. sigma_T
     crevasse_depth :
         crevasse depth in meters from ice surface
     water_depth : float, int
         distance from ice surface to water column within crevasse in m.
     has_water : bool, optional
         Is there water within the crevasse? Defaults to False.
+    density : np.array, float, int, optional
+        density to use in kg/m^3. Defaults to 917 kg/m^3 for ice.
 
     Returns
     -------
         sigma_A
 
     """
+
     sigma_A = traction_stress - (2 * density * g * crevasse_depth) / pi
     if has_water:
         sigma_A = (
@@ -273,7 +291,12 @@ def applied_stress(
             * g
             * water_depth
             * np.arcsin(water_depth / crevasse_depth)
-            + (2 * DENSITY_WATER * g * (crevasse_depth**2 - water_depth**2) ** (0.5))
+            + (
+                2
+                * DENSITY_WATER
+                * g
+                * (crevasse_depth**2 - water_depth**2) ** (0.5)
+            )
             / pi
         )
     return sigma_A
@@ -285,7 +308,9 @@ def alpha(dislocation_type="edge", crack_opening_mode=None):
     elif dislocation_type == "edge" or crack_opening_mode in [1, 2, "I", "II"]:
         alpha = 1 - POISSONS_RATIO
     else:
-        print(f"incorrect function inputs, assuming edge dislocation alpha=1-v")
+        print(
+            f"incorrect function inputs, assuming edge dislocation alpha=1-v"
+        )
         alpha = 1 - POISSONS_RATIO
     return alpha
 
@@ -299,6 +324,7 @@ def elastic_displacement(
     alpha=(1 - POISSONS_RATIO),
     has_water=True,
     density=DENSITY_ICE,
+    calc_applied=True,
 ):
     """calculate elastic crevasse wall displacement from applied stress sigma_T.
 
@@ -327,8 +353,17 @@ def elastic_displacement(
 
     """
     # define D and alpha for a water-free crevasse
-    sigma_A = applied_stress(
-        sigma_T, crevasse_depth, water_depth, has_water=has_water, density=density
+
+    sigma_A = (
+        applied_stress(
+            sigma_T,
+            crevasse_depth,
+            water_depth,
+            has_water=has_water,
+            density=density,
+        )
+        if calc_applied
+        else sigma_T
     )
     # define constant to advoid repeated terms in D equation
     c1 = (2 * alpha) / (mu * pi)
@@ -341,7 +376,9 @@ def elastic_displacement(
             * g
             * z**2
             * 0.5
-            * np.log(sum_over_diff(crevasse_depth, diff_squares(crevasse_depth, z)))
+            * np.log(
+                sum_over_diff(crevasse_depth, diff_squares(crevasse_depth, z))
+            )
         )
     )
     if has_water:
@@ -504,7 +541,11 @@ def G(b, d, H):
     G = (
         3.52 * (1 - gamma) / (1 - lam) ** (3 / 2)
         - (4.35 - 5.28 * gamma) / (1 - lam) ** 0.5
-        + ((1.3 - 0.3 * gamma ** (3.2)) / (1 - gamma**2) ** 0.5 + 0.83 - 1.76 * gamma)
+        + (
+            (1.3 - 0.3 * gamma ** (3.2)) / (1 - gamma**2) ** 0.5
+            + 0.83
+            - 1.76 * gamma
+        )
         * (1 - (1 - gamma) * lam)
     )
     return G
@@ -532,7 +573,9 @@ def overburden_stress(b):
 
 def f2(b, d, H, rhoi=917, rhos=350, C=0.02):
     """integral within the equation for KI(2) van der veen 1998"""
-    return (-b + (rhoi - rhos) / (rhoi * C) * (1 - np.exp(-C * b))) * G(b, d, H)
+    return (-b + (rhoi - rhos) / (rhoi * C) * (1 - np.exp(-C * b))) * G(
+        b, d, H
+    )
 
 
 def f3(a, b, d, H):
@@ -664,7 +707,11 @@ def evaluate_KI3(a, d, H):
     """
     x = np.arange(a, d, 0.01)
     f = f3(a, x, d, H)
-    return ((2 * 1000 * 9.81) / np.sqrt(np.pi * d) * trapz(f, x)) / 1e6 if d > a else 0
+    return (
+        ((2 * 1000 * 9.81) / np.sqrt(np.pi * d) * trapz(f, x)) / 1e6
+        if d > a
+        else 0
+    )
 
 
 def evaluate_KInet(d, H, Rxx, a, rhoi=917, rhos=350, C=0.02):
@@ -702,7 +749,9 @@ def penetration_depth_equ(d, H, Rxx, KIC, rhos=350, crev_spacing=None):
         initial crevasse depth in meters.
     """
     K1 = (
-        KI1_shielding(d, Rxx, crev_spacing) if crev_spacing else evaluate_KI1(d, H, Rxx)
+        KI1_shielding(d, Rxx, crev_spacing)
+        if crev_spacing
+        else evaluate_KI1(d, H, Rxx)
     )
     return K1 + evaluate_KI2(d, H, rhos=rhos) - KIC
 
@@ -740,13 +789,21 @@ def find_crev_depth(H, Rxx, KIC, rhos=350, crev_spacing=None, d=None):
     if crev_spacing:
         xx = np.array(
             [
-                KI1_shielding(x, Rxx, crev_spacing) + evaluate_KI2(x, H, rhos=rhos)
+                KI1_shielding(x, Rxx, crev_spacing)
+                + evaluate_KI2(x, H, rhos=rhos)
                 for x in d
             ]
         )
     else:
         xx = np.array(
-            [evaluate_KI1(x, H, Rxx) + evaluate_KI2(x, H, rhos=rhos) for x in d]
+            [
+                evaluate_KI1(x, H, Rxx) + evaluate_KI2(x, H, rhos=rhos)
+                for x in d
+            ]
         )
-    d_final = d[np.where(xx >= KIC)[0][-1]] if len(d[np.where(xx >= KIC)[0]]) > 0 else 0
+    d_final = (
+        d[np.where(xx >= KIC)[0][-1]]
+        if len(d[np.where(xx >= KIC)[0]]) > 0
+        else 0
+    )
     return round(d_final, 1)
