@@ -257,6 +257,7 @@ class CrevasseField:
             creep_table=self.creep,
             include_creep=self.comp_options.include_creep,
             initial_depth=self.initial_depth,
+            crev_spacing=self.geometry.crev_spacing
         )
 
         self.xcoords.append(-self.geometry.length)

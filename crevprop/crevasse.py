@@ -57,6 +57,7 @@ from numpy import sqrt, abs
 from numpy.polynomial import Polynomial as P
 from scipy.constants import g, pi
 from scipy.interpolate import interpn
+from scipy.integrate import trapz
 from typing import Union, Tuple, List
 
 from .physical_constants import (
@@ -66,6 +67,8 @@ from .physical_constants import (
     SECONDS_IN_DAY,
     SECONDS_IN_YEAR,
 )
+
+from .fracture import f2
 
 # math helper functions to simplify the
 
@@ -201,6 +204,7 @@ class Crevasse:
         never_closed=False,
         creep_table=None,
         initial_depth=None,
+        crev_spacing=None
     ):
         self.z = z
         self.dz = dz
@@ -218,6 +222,7 @@ class Crevasse:
 
         # self.flotation_depth = (1-self.ice_density/1000) * self.ice_thickness
         self.sigma_crev = sigma_crev
+        self.crev_spacing = crev_spacing
 
         # dynamic, set initial crev conditions
         self.depth = initial_depth if not None else 30
@@ -893,18 +898,23 @@ class Crevasse:
 
         return max(0, round(crevasse_depth - water_height, 2))
 
-    def calc_water_height(self, crevasse_depth, Rxx=None):
+    def calc_water_height(self, crevasse_depth, Rxx=None, simplify=False):
         """calc water high in crevasse using Hooke text book formulation
 
         Linear Elastic Fracture Mechanics
 
-        van der Veen 1998/2007 equation to estimate the net stress
+        van der Veen 2007 equation to estimate the net stress
         intensity factor (KI) for mode I crack opening where::
 
             KI = tensile stress - lithostatic stress + water pressure(1)
             KI = 1.12 * Rxx * sqrt(pi * ice_thickness)               (2)
             - 0.683 * ice_density * g * ice_thickness**1.5
             + 0.683 * water_density * g * water_height**1.5
+            
+        NOTE:: This uses a simplification for K_I (2) which only 
+        accounts for ice! not a firn layer or variable density
+        
+        CHANGING THIS! Was okay before, need to add condition
 
 
         because KI = KIC (the `fracture_toughness` of ice) when a crack
@@ -931,7 +941,14 @@ class Crevasse:
         Parameters
         ----------
         crevasse_depth: float, int, np.array, list
-            crevasse depth below ice surface (m)
+            crevasse depth below ice surface in meters. positive.
+        Rxx : float
+            Tensile stress in Pa. Defaults to None.
+        simplify : bool
+            Simplify to the Nye formulation where KI2 is calculated for
+            a constant ice density. If False do not simplify and use the
+            full van der veen 1998 formulation for a depth-variable 
+            density for a surface firn layer. Defaults to False. 
 
         Returns
         -------
@@ -940,14 +957,19 @@ class Crevasse:
             values (0, crevasse_depth) -> boundaries rep a water-free
             crevasse (=0) or a copletely full crevasse (=crevase_depth).
         """
-        return (
-            (
-                self.fracture_toughness
-                - self.tensile_stress(crevasse_depth, Rxx=Rxx)
-                + 0.683*self.ice_density*g*sqrt(pi)*(crevasse_depth**1.5)
-            )
-            / (0.683 * DENSITY_WATER * g * sqrt(pi))
-        ) ** (2 / 3)
+        KI1 = self.tensile_stress(crevasse_depth, Rxx=Rxx)
+        KI3 = 0.683 * DENSITY_WATER * g * np.sqrt(pi)
+        
+        if simplify:
+            # use the nye formulation assuming uniform ice density
+            KI2 = 0.683 * self.ice_density * g * sqrt(pi)*(crevasse_depth**1.5)
+        else: 
+            # use variable density for a surface firn layer
+            KI2 = self.KI2(crevasse_depth)
+        
+
+        return np.abs((self.fracture_toughness - KI1 + KI2)/ KI3) ** (2/3)
+        
 
     def dry_crevasse(self):
         z = np.arange(-self.depth, 0, 0.1)
@@ -965,11 +987,36 @@ class Crevasse:
         
         
         pass
+    
+    def KI2(self, crev_depth):
+        """Calculate KI2 in Pa
 
+        Numerically solve for the 2nd component of the stress intensity
+        factor KI(2), lithostatic pressure contribution using equ 14
+        from van der veen 1998
+        
+        
+        Parameters
+        ----------
+        crev_depth : float
+            crevasse depth in meters
+        Returns
+        -------
+        KI2 : _type_
+            KI(2) overburden component of the stress intensity factor
+        """
+        x=np.arange(0.01,crev_depth,0.01)
+        f=f2(x, crev_depth, self.ice_thickness, rhos=self.surface_density)
+        i_trapz = trapz(f,x)
+        return ((2*DENSITY_ICE*g)/np.sqrt(pi*crev_depth)) * i_trapz
+    
+ 
+    
+    
     def tensile_stress(self, crevasse_depth, Rxx=None):
         """calculate tensile stress
 
-        LEFM
+        LEFM, KI1
 
         Note
         ----
@@ -1002,15 +1049,15 @@ class Crevasse:
 
         Returns
         -------
-            stress intensity factor's tensile component
+            stress intensity factor's tensile component in Pa
         """
         Rxx = Rxx if Rxx else self.sigma_crev
-        return self.F(crevasse_depth) * Rxx * sqrt(pi * crevasse_depth)
+        return self.F(crevasse_depth) * Rxx * np.sqrt(pi * crevasse_depth)
 
     def F(self, crev_depth):
         """Finite ice thickness correction for stress intensity factor
 
-        LEFM
+        LEFM, correction for KI(1)
 
         from van der Veen (1998) equation 6
         F(lambda) where lambda = crevasse depth / ice thickness
@@ -1029,10 +1076,6 @@ class Crevasse:
         ----------
         crev_depth: float, int
             depth below surface in meters
-        use_approximation: bool
-            whether to use shallow crevasse approximation.
-            if True return 1.12 instead of the polynomial expansion.
-            Defaults to False
 
         Returns
         -------
@@ -1043,26 +1086,48 @@ class Crevasse:
         return (
             1.12 if self.approximate_F else p(crev_depth / self.ice_thickness)
         )
+        
+    def KI1_shielding(self,crev_depth,Rxx):
+        """Calculate KI(1) incorporating shielding from crevasse field
+
+        Parameters
+        ----------
+        crev_depth : float
+            crevasse depth in meters.
+        Rxx : float
+            stress
+
+        Returns
+        -------
+        KI(1) : float
+            KI(1) in units of Pa. 
+        """
+        W = self.crev_spacing / 2
+        S = W / (W+crev_depth)
+        n = 1/np.sqrt(pi)
+        p = P([n,n*0.5,n*(3/8),n*(5/16),n*(35/128),n*(63/256),n*(231/1024),22.501,-63.502,58.045,-17.577])
+        return (p(S)*Rxx*np.sqrt(pi*crev_depth*S))
+        
 
     def crevasse_volume(self, z, water_depth, Dleft, Dright):
         """calculate volume of water filled crevasse
 
         Parameters
         ----------
-            z : np.array
-                vertical spacing/coordinates corresponding to crevasse
-                wall profiles Dleft and Dright
-            water_depth : float, int
-                water depth in crevasse
-            Dleft : np.array
-                profile of left crevasse wall
-            Dright : np.array
-                profile of crevasse walls
+        z : np.array
+            vertical spacing/coordinates corresponding to crevasse
+            wall profiles Dleft and Dright
+        water_depth : float, int
+            water depth in crevasse
+        Dleft : np.array
+            profile of left crevasse wall
+        Dright : np.array
+            profile of crevasse walls
 
         Returns
         -------
-            volume : float
-                two-dimensional crevasse volume in square meters
+        volume : float
+            two-dimensional crevasse volume in square meters
 
 
         NOTE: Adapted from Poinar Matlab Script using matlab's `trapz`

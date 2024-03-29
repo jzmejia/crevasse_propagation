@@ -286,11 +286,7 @@ def applied_stress(
         sigma_A = (
             sigma_A
             - DENSITY_WATER * g * water_depth
-            + (2 / pi)
-            * DENSITY_WATER
-            * g
-            * water_depth
-            * np.arcsin(water_depth / crevasse_depth)
+            + (2 / pi)* DENSITY_WATER*g* water_depth * np.arcsin(water_depth / crevasse_depth)
             + (
                 2
                 * DENSITY_WATER
@@ -539,14 +535,10 @@ def G(b, d, H):
     gamma = b / d
     lam = d / H
     G = (
-        3.52 * (1 - gamma) / (1 - lam) ** (3 / 2)
-        - (4.35 - 5.28 * gamma) / (1 - lam) ** 0.5
-        + (
-            (1.3 - 0.3 * gamma ** (3.2)) / (1 - gamma**2) ** 0.5
-            + 0.83
-            - 1.76 * gamma
-        )
-        * (1 - (1 - gamma) * lam)
+        3.52 * (1-gamma)/(1-lam)**(3/2)
+        - (4.35-5.28*gamma)/(1-lam)**0.5
+        + ((1.3-0.3*gamma**(3.2))/(1-gamma**2)**0.5 + 0.83 - 1.76*gamma
+           ) * (1-(1-gamma)*lam)
     )
     return G
 
@@ -572,10 +564,24 @@ def overburden_stress(b):
 
 
 def f2(b, d, H, rhoi=917, rhos=350, C=0.02):
-    """integral within the equation for KI(2) van der veen 1998"""
-    return (-b + (rhoi - rhos) / (rhoi * C) * (1 - np.exp(-C * b))) * G(
-        b, d, H
-    )
+    """integral within the equation for KI(2) van der veen 1998
+    
+    Parameters
+    ----------
+    b : np.array
+        array with depth below surface in meters (float). 
+    d : float
+        crevasse depth in meters.
+    H : float
+        ice thickness in meters.
+    rhoi : int, float
+        ice density in kg/m^3. Defaults to 917. 
+    rhos : int, float
+        surface density in kg/m^3. Defaults to 350.
+    C : float
+        Paterson empirical coefficient in m^-1. Defaults to 0.02
+    """
+    return (-b + (rhoi-rhos)/(rhoi*C) * (1-np.exp(-C*b))) * G(b,d,H)
 
 
 def f3(a, b, d, H):
