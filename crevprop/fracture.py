@@ -513,6 +513,11 @@ def G(b, d, H):
     """Functional expression G in KI2 evaluation.
 
     G(gamma,lambda) where gamma=b/d, lambda=d/H
+    
+    b is depth below surface, d is crevasse depth, and H is ice thickness
+    all with units of meters. 
+    
+    
     from Tada et al., 1973 p 2.27, based on polynomial curve fitting to
     numerically derived solutions for the second component of the stress
     intensity factor KI2 for mode I crack opening. Implementiation also

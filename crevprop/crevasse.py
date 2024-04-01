@@ -1207,6 +1207,7 @@ class Crevasse:
             density as a function of depth in kg/m^3 corresponding to the
             b array input to function.
         """
+        z=np.abs(z)
         return DENSITY_ICE-(DENSITY_ICE-self.surface_density)*np.exp(-C*z)
 
 
