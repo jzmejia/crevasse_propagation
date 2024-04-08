@@ -27,6 +27,7 @@ from crevprop.iceblock import IceBlock
 
 # initialize model geometry for a domain with an ice thickness
 # of 1000 m and vertical resolution (dz spacing) of 1 m.
+df = pd.read_csv('temperature_profile.csv')
 creep_df = pd.read_csv('creep_deformation_file_name.csv', 
                         names=['t','z'])  
 
