@@ -54,6 +54,21 @@ Module is currently unstable and we can not guarantee the validity of results
 or functionality until version 1 release.
 
 ## Model Overview
+`iceblock.py` - `IceBlock()` main container user interfaces with to run model, spin up domain, and evolve through time.
+`thermalmodel.py` - Thermal model for iceblock, manages and calculates changing ice temperatures, crevasse refreezing.  
+`crevassefield.py` - Main container managing crevasse field geometry and crevasse instances for each crevasse in domain.  
+`crevasse.py`  - Crevasse object implementing crevasse evolution and fracture mechanics to evolve crevasses through time.  
+
+  
+
+ 
+
+
+
+
+
+
+
 
 ### Model Parameters
 
@@ -69,11 +84,12 @@ Weertman 1964, 1983, 1996).
 | Ice thickness             | H             | `ice_thickness`| m |
 | Crevase spacing           | R             | `crev_spacing` | m  |
 | Water depth in crevasse   | w             | `water_depth`  | m  |
-| Longitudinal stress       | $\sigma _{y}$ | `sigma_crev`   | kPa  | |
+| Longitudinal stress       | $\sigma _{y}$ | `sigmaT0`   | kPa  | |
 | Shear modulus             | $\mu$   | `shear_modulus`,`mu`| 0.07-3.9 GPa |
 | Water flux                | Q             | `Qin`          | m $^{2}$ per timestep |
 | Water flux initialization |               | `Qin_annual`   | m $^{2}$ a $^{-1}$ |
 | Fracture toughness of ice | $K_{IC}$      | `fracture_toughness` | Pa m $^{0.5}$  |
+
 
 ### Comparison with notation used in the literature
 
