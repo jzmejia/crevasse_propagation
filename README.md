@@ -54,10 +54,12 @@ Module is currently unstable and we can not guarantee the validity of results
 or functionality until version 1 release.
 
 ## Model Overview
-`iceblock.py` - `IceBlock()` main container user interfaces with to run model, spin up domain, and evolve through time.
+`iceblock.py` - main container user interfaces with to run model, spin up domain, and evolve through time.  
 `thermalmodel.py` - Thermal model for iceblock, manages and calculates changing ice temperatures, crevasse refreezing.  
 `crevassefield.py` - Main container managing crevasse field geometry and crevasse instances for each crevasse in domain.  
 `crevasse.py`  - Crevasse object implementing crevasse evolution and fracture mechanics to evolve crevasses through time.  
+`fracture.py` - Individual functions for linear elastic fracture mechanics. Called by `Crevasse`. Stand alone use.  
+`utils.py` - Utilities, called by other files.  
 
   
 
