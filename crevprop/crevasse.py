@@ -218,7 +218,8 @@ class Crevasse:
         self.mu = mu
         self.ice_density = ice_density
         self.surface_density = surface_density
-        self.density = self.paterson_empirical_relation(self.z) 
+        self.density = self.ice_density
+        self.variable_density=False
 
         # self.flotation_depth = (1-self.ice_density/1000) * self.ice_thickness
         self.sigma_crev = sigma_crev
@@ -227,11 +228,15 @@ class Crevasse:
         # dynamic, set initial crev conditions
         self.depth = initial_depth if not None else 30
         self.volume = 1e-15
+        
+        
 
         # water-filled crevasse
         self.Qin = Qin
         self.Vwater = 0
         # self.Vpfa = 0
+        
+        self.thresh = self.KI2_threshold()
 
         # depth = distance from ice surface to water surface in crevasse
         self.water_depth = self.depth
@@ -415,7 +420,12 @@ class Crevasse:
             # vertical coordinate
             dy = 0.1 if abs(Z_elastic) > 30 else 0.01
             y = np.arange(-Z_elastic, 0, dy)
-            density = self.paterson_empirical_relation(y)
+            
+            if Z_elastic < self.thresh:
+                density = self.paterson_empirical_relation(y)
+            else:
+                density=DENSITY_ICE
+            
             
 
             # 1. calc water depth for KI(cracktip) = KIC
@@ -427,8 +437,8 @@ class Crevasse:
             # right now filling with nans outside of crev size, do i
             # want to do this if i have to subtract or set to zero then
             # nan later for plotting?
-            E0 = self.elastic_displacement(y, self.water_depth, self.depth, density=density)
-            E = self.elastic_displacement(y, water_depth, Z_elastic, density=density)
+            E0 = self.elastic_displacement(y, self.water_depth, self.depth)
+            E = self.elastic_displacement(y, water_depth, Z_elastic)
 
             # Elastic differential opening
             EDiff = E if self.n == 1 else E - E0
@@ -450,7 +460,7 @@ class Crevasse:
             # Creep Closure
             # -------------
             if self.include_creep and self.creep is not None:
-                CDiff = self.creep_closing(Z_elastic, y)
+                CDiff = self.creep_closing(Z_elastic, y, creep_adj=density/DENSITY_ICE)
             else:
                 CDiff = np.zeros_like(FDiff[0])  # why not just not include?
 
@@ -498,7 +508,10 @@ class Crevasse:
             # if the difference between Z calculated for the current and
             #   last run of the while loop is very small or the crevase
             #   reached bedrook then break the loop
-
+            
+            
+            # shouldn't we also force growth for high water levels that
+            # would cause KI>KIC?
             if Vwater == 0:
                 dz = dz / 2 if Vwaterwas0 else dz
                 Vwaterwas0 = True
@@ -581,12 +594,14 @@ class Crevasse:
 
         self.Vfrz = Vfrz
         self.Vwater = Vwater
+        
+        
 
         print(f"for n={self.n} depth={self.depth} m, width={self.width} m")
 
         return water_depth
 
-    def creep_closing(self, crev_depth, y, age=None):
+    def creep_closing(self, crev_depth, y, age=None, creep_adj=None):
         """calculate creep closing of crevasse walls for timestep
 
         had parameter water_residence_time that was getting instance
@@ -599,6 +614,15 @@ class Crevasse:
             organized as -crevasse depth to 0 (ice surface)
         crev_depth : float
             depth of crevasse in meters
+        age : optinal
+            Defaults to None.
+        creep_adj : optional, np.array
+            np.array corresponding to y with adjustment values to apply
+            to CDIFF outputs. Use case is in accounting for variable 
+            surface density whereby the creep adjustment is the density
+            vector corresponding to y/ice density. The result of using
+            this will be CDiff values reduced for lower densities near
+            the surface. Defaults to None. 
 
         Returns
         -------
@@ -639,7 +663,8 @@ class Crevasse:
         # if changing interp resolution, return to original res here.
         creep = np.asarray(creep)
         # convert from meters per year to meters per timestep dt
-        CDiff = creep * (self.dt / SECONDS_IN_YEAR)
+        CDiff = creep * (self.dt / SECONDS_IN_YEAR) 
+        CDiff = CDiff * creep_adj if creep_adj is not None else CDiff
 
         # convert to half-width
         CDiff = CDiff / 2
@@ -731,11 +756,8 @@ class Crevasse:
             units m, values are all positive.
         """
 
-        # take supset of depth array to avoide dividing by zero at
-        # crevasse tip
+        # take supset of depth array to avoid div by 0 at crevasse tip
         z = Z[Z > -crev_depth]
-        if isinstance(density,np.ndarray):
-            density = self.paterson_empirical_relation(z)
             
 
         # define D and alpha for a water-free crevasse
@@ -839,24 +861,15 @@ class Crevasse:
         applied_stress: float
             stress applied to crevasse walls (Rxx)
         """
+        density=np.mean(density)
         # will this need to be updated to incorporate variable density?
         sigma_A = sigma_T - (2 * density * g * crevasse_depth) / pi
         if has_water:
             sigma_A = (
                 sigma_A
                 - DENSITY_WATER * g * water_depth
-                + (2 / pi)
-                * DENSITY_WATER
-                * g
-                * water_depth
-                * np.arcsin(water_depth / crevasse_depth)
-                + (
-                    2
-                    * DENSITY_WATER
-                    * g
-                    * (crevasse_depth**2 - water_depth**2) ** (0.5)
-                )
-                / pi
+                + (2 / pi)* DENSITY_WATER*g* water_depth* np.arcsin(water_depth / crevasse_depth)
+                + (2* DENSITY_WATER* g* (crevasse_depth**2 - water_depth**2) ** (0.5))/ pi
             )
         return sigma_A
 
@@ -958,37 +971,52 @@ class Crevasse:
             crevasse (=0) or a copletely full crevasse (=crevase_depth).
         """
         KI1 = self.tensile_stress(crevasse_depth, Rxx=Rxx)
+        KI2 = self.evaluate_KI2(crevasse_depth, simplify=simplify)
         KI3 = 0.683 * DENSITY_WATER * g * np.sqrt(pi)
         
-        if simplify:
-            # use the nye formulation assuming uniform ice density
-            KI2 = 0.683 * self.ice_density * g * sqrt(pi)*(crevasse_depth**1.5)
-        else: 
-            # use variable density for a surface firn layer
-            KI2 = self.KI2(crevasse_depth)
+        return np.abs((self.fracture_toughness - KI1 - KI2)/ KI3) ** (2/3)
         
-
-        return np.abs((self.fracture_toughness - KI1 + KI2)/ KI3) ** (2/3)
+    # def dry_crevasse(self):
+    #     z = np.arange(-self.depth, 0, 0.1)
+    #     # add in variable density, going back to update rest of class
+    #     x = self.elastic_displacement(
+    #         z,
+    #         self.sigma_crev,
+    #         self.mu,
+    #         self.depth,
+    #         self.depth,
+    #         has_water=False,
+    #         density=self.paterson_empirical_relation(z)
+    #     )
         
-
-    def dry_crevasse(self):
-        z = np.arange(-self.depth, 0, 0.1)
-        # add in variable density, going back to update rest of class
-        x = self.elastic_displacement(
-            z,
-            self.sigma_crev,
-            self.mu,
-            self.depth,
-            self.depth,
-            has_water=False,
-            density=self.paterson_empirical_relation(z)
-        )
-        
-        
-        
-        pass
     
-    def KI2(self, crev_depth):
+    def evaluate_KI2(self, crevasse_depth, simplify=False):
+        
+        if simplify or crevasse_depth > self.thresh:
+            KI2 = -0.683*g*self.ice_density*sqrt(pi)*(crevasse_depth**1.5)
+            
+        else :
+            KI2 = self.variable_density_KI2(crevasse_depth)
+            
+        return KI2
+    
+    def KI2_threshold(self):
+        """Threshold where KI2 variable and const density solutions meet
+
+        Returns
+        -------
+        threshold : float
+            depth where KI2 solutions meet to be used in to determine 
+            the cutoff point for using the variable density KI2 solution.
+        """
+        
+        v1=np.array([self.evaluate_KI2(x,simplify=True) for x in abs(self.z)])
+        v2=np.array([self.variable_density_KI2(x) for x in abs(self.z)])
+       
+        
+        return abs(self.z[(v1-v2)>0][-1])
+    
+    def variable_density_KI2(self, crev_depth):
         """Calculate KI2 in Pa
 
         Numerically solve for the 2nd component of the stress intensity
@@ -1003,15 +1031,13 @@ class Crevasse:
         Returns
         -------
         KI2 : _type_
-            KI(2) overburden component of the stress intensity factor
+            KI(2) overburden component of the stress intensity factor in
+            Pa. Values are negative. 
         """
         x=np.arange(0.01,crev_depth,0.01)
         f=f2(x, crev_depth, self.ice_thickness, rhos=self.surface_density)
         i_trapz = trapz(f,x)
         return ((2*DENSITY_ICE*g)/np.sqrt(pi*crev_depth)) * i_trapz
-    
- 
-    
     
     def tensile_stress(self, crevasse_depth, Rxx=None):
         """calculate tensile stress
